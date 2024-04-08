@@ -14,4 +14,4 @@ from genetic data is part of [PopGenomicsTools](https://github.com/tplinderoth/P
 
 ### Data
 
-Data used to produce the results of this study are publically available on Dryad (temporary link for peer review):
+Data used to produce the results of this study are publically available on Dryad: <https://doi.org/10.5061/dryad.z612jm6j0>
