@@ -313,6 +313,8 @@ eval $CMD
 
 ## Map clean reads to the FSJ V3 reference genome
 
+This step also marks residual duplicate reads.
+
 $ /mnt/research/Fitz_Lab/projects/mosaic/map/map_reads_array.sh
 implements:
 
@@ -723,6 +725,10 @@ bcftools view -H -R "$REGFILE" -f "PASS" -i 'N_PASS(GT[0-27]!="mis" & FMT/DP > 2
 
 --- end bash code ---
 
+## Produce a sites-only allsites VCF (no individual genotype information)
+
+$ bcftools view -G -O z /mnt/research/Fitz_Lab/projects/mosaic/variants/vcf/all_sites/fsj_mosaic_allsites_genome.vcf.gz > /mnt/research/Fitz_Lab/projects/mosaic/variants/vcf/all_sites/fsj_mosaic_allsites_genome_sitesonly.vcf.gz
+
 ## Extract all-variants VCF subset
 
 Extract variable sites from all-sites VCF
@@ -810,19 +816,105 @@ tabix -p vcf $OUTVCF
 --- end bash code ---
 
 
+## ---------- RELATEDNESS ESTIMATED FROM GENOMIC DATA ---------- ## TL TODO
 
 ## ---------- SITE FREQUENCY SPECTRUM ---------- ##
 
-# Scripts for estimating the SFS are on ICER in /mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs
-# main_autosome_sfs.sh
-# main_autosome_realsfs_fold.sh
-# main_autosome_grp_sfs_array.sh
-# main_autosome_grp_realsfs_fold_array.sh
-# main_autosome_grp_sfs_array2.sh
-# main_autosome_grp_realsfs_fold_array2.sh
+# Folded SFS calculated from all sites (best SFS estimate, used for estimating diversity)
 
-R
+Estimate per site allele frequency likelihoods for all quality controlled sites
 
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/main_autosome_grp_sfs_array2.sh
+implements:
+
+--- start bash code ---
+
+GRP_ARR=('resident' 'C')
+FSJGRP="${GRP_ARR[$SLURM_ARRAY_TASK_ID]}"
+BAMLIST="/mnt/research/Fitz_Lab/projects/mosaic/map/mosaic_${FSJGRP}_bam_list.txt"
+OUTPREFIX="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_allsites_main_autosomes_qc_${FSJGRP}"
+REGFILE='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ_V3_main_autosomes.txt'
+SITESFILE='/mnt/research/Fitz_Lab/projects/mosaic/variants/vcf/all_sites/fsj_mosaic_allsites_main_autosomes_qc.pos'
+REF='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ.V3.fa'
+
+CMD="angsd -bam $BAMLIST -out $OUTPREFIX -GL 1 -doSaf 1 -anc $REF -minQ 20 -minMapQ 20 -rf $REGFILE -sites $SITESFILE -P 4"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
+
+--- end bash code ---
+
+Estimate folded SFS
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/main_autosome_grp_realsfs_fold_array2.sh
+implements:
+
+--- start bash code ---
+
+GRP_ARR=('resident' 'C')
+FSJGRP="${GRP_ARR[$SLURM_ARRAY_TASK_ID]}"
+SAFIDX="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_allsites_main_autosomes_qc_${FSJGRP}.saf.idx"
+OUTSFS="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_allsites_main_autosomes_qc_${FSJGRP}.fold.sfs"
+
+CMD="realSFS $SAFIDX -fold 1 -P 20 > $OUTSFS"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
+
+--- end bash code ---
+
+# R functions for visualizing SFS
+
+--- start R code ---
+
+# plot SFS
+plotsfs <- function(x = NULL, outfile = NULL, grp = NULL, fold = 0) {
+        if (!is.null(outfile)) pdf(file=outfile) else x11()
+        par(mfrow=c(2,2))
+        for (i in 1:length(x)) {
+                if (fold == 0) {
+                        barplot(x[[i]][-c(1,length(x[[i]]))], main = grp[i], ylab="Number sites", xlab="Derived AF", names.arg=1:(length(x[[i]])-2))
+                } else if (fold == 1) {
+                        barplot(x[[i]][-1], main = grp[i], ylab="Number sites", xlab="MAF", names.arg=1:(length(x[[i]])-1))
+                } else {
+                        stop("fold argument must be 0 or 1")
+                }
+                if (is.null(outfile) && i %% 4 == 0) {
+                        x11()
+                        par(mfrow=c(2,2))
+                }
+        }
+        if (!is.null(outfile)) invisible(dev.off())
+}
+
+neutral.sfs <- function(n) {
+	# makes expected neutral SFS
+        # n: diploid sample size
+        sfs.vec <- rep(NA,n)
+        for (i in 1:((2*n)-1)) {
+                sfs.vec[i] = 1/i
+        }
+        sfs.vec <- sfs.vec/sum(sfs.vec)
+        return(sfs.vec)
+}
+
+foldsfs <- function(x) {
+	# folds the SFS
+        n = length(x)+1
+        fold.sfs <- NULL
+        for (i in 1:(n/2-1)) {
+                fold.sfs <- c(fold.sfs, x[i]+x[n-i])
+        }
+        fold.sfs <- c(fold.sfs, x[n/2])
+
+        return(fold.sfs)
+}
+
+# Examples for reading in SFS data for use the with function above
+
+# define groups and sample sizes
 sfsdir='./sfs/'
 jaygrp = c('C','E','T','M4','I','all')
 dipn = c(28, 11, 29, 13, 6, 87)
@@ -833,65 +925,23 @@ bisnp.ufold <- list()
 
 # read in SFS data
 for (i in 1:length(jaygrp)) {
-	grp <- jaygrp[i]
-	n <- dipn[i]
-	sfs.fold[[i]] <- scan(paste0(sfsdir,"fsj_mosaic_allsites_main_autosomes_qc_",grp,".fold.sfs"))
-	sfs.fold[[i]] <- sfs.fold[[i]][1:(n+1)]
-	sfs.ufold[[i]] <- scan(paste0(sfsdir,"fsj_mosaic_allsites_main_autosomes_qc_",grp,".unfold.sfs"))
-	bisnp.fold[[i]] <- scan(paste0(sfsdir,"fsj_mosaic_biallelic_snps_main_autosomes_qc_",grp,".fold.sfs"))
-	bisnp.fold[[i]] <- bisnp.fold[[i]][1:(n+1)]
-	bisnp.ufold[[i]] <- scan(paste0(sfsdir,"fsj_mosaic_biallelic_snps_main_autosomes_qc_",grp,".unfold.sfs"))
+        grp <- jaygrp[i]
+        n <- dipn[i]
+        sfs.fold[[i]] <- scan(paste0(sfsdir,"fsj_mosaic_allsites_main_autosomes_qc_",grp,".fold.sfs"))
+        sfs.fold[[i]] <- sfs.fold[[i]][1:(n+1)]
+        sfs.ufold[[i]] <- scan(paste0(sfsdir,"fsj_mosaic_allsites_main_autosomes_qc_",grp,".unfold.sfs"))
+        bisnp.fold[[i]] <- scan(paste0(sfsdir,"fsj_mosaic_biallelic_snps_main_autosomes_qc_",grp,".fold.sfs"))
+        bisnp.fold[[i]] <- bisnp.fold[[i]][1:(n+1)]
+        bisnp.ufold[[i]] <- scan(paste0(sfsdir,"fsj_mosaic_biallelic_snps_main_autosomes_qc_",grp,".unfold.sfs"))
 }
 
-# plot SFS
-plotsfs <- function(x = NULL, outfile = NULL, grp = NULL, fold = 0) {
-	if (!is.null(outfile)) pdf(file=outfile) else x11()
-	par(mfrow=c(2,2))
-	for (i in 1:length(x)) {
-		if (fold == 0) {
-			barplot(x[[i]][-c(1,length(x[[i]]))], main = grp[i], ylab="Number sites", xlab="Derived AF", names.arg=1:(length(x[[i]])-2))
-		} else if (fold == 1) {
-			barplot(x[[i]][-1], main = grp[i], ylab="Number sites", xlab="MAF", names.arg=1:(length(x[[i]])-1))
-		} else {
-			stop("fold argument must be 0 or 1")
-		}
-		if (is.null(outfile) && i %% 4 == 0) {
-			x11()
-			par(mfrow=c(2,2))
-		}
-	}
-	if (!is.null(outfile)) invisible(dev.off())
-}
+# plot each group (includes Contemporary CR population, 'C', plot)
+plotsfs(x=sfs.fold, outfile='fsj_mosaic_allsites_main_autosomes_qc_fold.pdf', grp=jaygrp, fold=1)
+plotsfs(x=sfs.ufold, outfile='fsj_mosaic_allsites_main_autosomes_qc_unfold.pdf', grp=jaygrp, fold=0)
+plotsfs(x=bisnp.fold, outfile='fsj_mosaic_biallelic_snps_main_autosomes_qc_fold.pdf', grp=jaygrp, fold=1)
+plotsfs(x=bisnp.ufold, outfile='fsj_mosaic_biallelic_snps_main_autosomes_qc_ufold.pdf', grp=jaygrp, fold=0)
 
-#plotsfs(x=sfs.fold, outfile='fsj_mosaic_allsites_main_autosomes_qc_fold.pdf', grp=jaygrp, fold=1)
-#plotsfs(x=sfs.ufold, outfile='fsj_mosaic_allsites_main_autosomes_qc_unfold.pdf', grp=jaygrp, fold=0)
-#plotsfs(x=bisnp.fold, outfile='fsj_mosaic_biallelic_snps_main_autosomes_qc_fold.pdf', grp=jaygrp, fold=1)
-#plotsfs(x=bisnp.ufold, outfile='fsj_mosaic_biallelic_snps_main_autosomes_qc_ufold.pdf', grp=jaygrp, fold=0)
-
-# plot SFS for pops with reassigned individuals banded as adults
-neutral.sfs <- function(n) {
-	# n: diploid sample size
-	sfs.vec <- rep(NA,n)
-	for (i in 1:((2*n)-1)) {
-		sfs.vec[i] = 1/i
-	}
-	sfs.vec <- sfs.vec/sum(sfs.vec)
-	return(sfs.vec)
-}
-
-foldsfs <- function(x) {
-	n = length(x)+1
-	fold.sfs <- NULL
-	for (i in 1:(n/2-1)) {
-		fold.sfs <- c(fold.sfs, x[i]+x[n-i])
-	}
-	fold.sfs <- c(fold.sfs, x[n/2])
-
-	return(fold.sfs)
-}
-
-# Resident
-
+# Resident CR plot
 res <- scan('./sfs/fsj_mosaic_allsites_main_autosomes_qc_resident.fold.sfs')
 res.fold <- res[2:((length(res)-1)/2)]
 
@@ -902,18 +952,93 @@ res.exp.fold.counts <- sum(res.fold) * res.exp.fold
 
 barplot(res.exp.fold.counts, xlab="Minor allele frequency", names.arg = 1:length(res.exp.fold.counts), ylab="Number sites",cex.lab=1.3, cex.axis=1.3)
 
-# Translocated
-trans <- scan('./sfs/fsj_mosaic_allsites_main_autosomes_qc_translocated.fold.sfs')
-trans.fold <- trans[2:((length(trans)-1)/2)]
+--- end R code ---
 
-# expected translocated SFS
-trans.exp <- neutral.sfs(n=30)
-trans.exp.fold <- foldsfs(trans.exp)
-trans.exp.fold.counts <- sum(trans.fold) * trans.exp.fold
+## ---------- FST ---------- ##
 
-barplot(trans.exp.fold.counts, xlab="Minor allele frequency", names.arg = 1:length(res.exp.fold.counts), ylab="Number sites",cex.lab=1.3, cex.axis=1.3)
+FST were calculated using variable sites only
+
+# Estimate unfolded joint SFS to serve as joint allele frequency prior for SNPs
+
+Estimate allele frequency likelihoods for quality-controlled SNPs
+Note: the 'translocated' group for FST estimation includes RSW-K (T_072, no translocated) and so really represents the pooled donor sites
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/main_autosome_snps_grp_sfs_array2.sh
+implements:
+
+--- start bash code ---
+
+GRP_ARR=('resident' 'translocated' 'C')
+FSJGRP="${GRP_ARR[$SLURM_ARRAY_TASK_ID]}"
+BAMLIST="/mnt/research/Fitz_Lab/projects/mosaic/map/mosaic_${FSJGRP}_bam_list.txt"
+OUTPREFIX="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_biallelic_snps_main_autosomes_qc_${FSJGRP}"
+REGFILE='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ_V3_main_autosomes.txt'
+SITESFILE='/mnt/research/Fitz_Lab/projects/mosaic/variants/vcf/biallelic_snps/fsj_mosaic_biallelic_snps_main_autosomes_qc.pos'
+REF='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ.V3.fa'
+
+CMD="angsd -bam $BAMLIST -out $OUTPREFIX -GL 1 -doSaf 1 -anc $REF -minQ 20 -minMapQ 20 -rf $REGFILE -sites $SITESFILE -P 4"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
+
+--- end bash code ---
+
+
+Estimate unfolded 2D-SFS
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/main_autosome_snps_2dsfs_array2.sh
+implements:
+
+--- start bash code ---
+
+CMP=('resident:C' 'resident:translocated' 'translocated:C')
+POP1=$(echo "${CMP[$SLURM_ARRAY_TASK_ID]}" | cut -f1 -d':')
+POP2=$(echo "${CMP[$SLURM_ARRAY_TASK_ID]}" | cut -f2 -d':')
+SAFIDX1="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_biallelic_snps_main_autosomes_qc_${POP1}.saf.idx"
+SAFIDX2="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_biallelic_snps_main_autosomes_qc_${POP2}.saf.idx"
+OUTSFS="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_biallelic_snps_main_autosomes_qc_${POP1}_vs_${POP2}.unfold.2dsfs"
+
+CMD="realSFS $SAFIDX1 $SAFIDX2 -P 20 > $OUTSFS"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
+
+--- end bash code ---
+
+# Estimate pairwise FST for {resident CR vs contemporary CR} and {resident vs pooled donor sites}
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/main_autosome_snps_2dsfs_array2.sh
+implements:
+
+--- start bash code ---
+
+CMP=('resident:C' 'resident:translocated' 'translocated:C')
+POP1=$(echo "${CMP[$SLURM_ARRAY_TASK_ID]}" | cut -f1 -d':')
+POP2=$(echo "${CMP[$SLURM_ARRAY_TASK_ID]}" | cut -f2 -d':')
+SAFIDX1="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_biallelic_snps_main_autosomes_qc_${POP1}.saf.idx"
+SAFIDX2="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_biallelic_snps_main_autosomes_qc_${POP2}.saf.idx"
+SFSPRIOR="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_biallelic_snps_main_autosomes_qc_${POP1}_vs_${POP2}.unfold.2dsfs"
+OUTFILE="/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_${POP1}_vs_${POP2}"
+
+CMD="realSFS fst index $SAFIDX1 $SAFIDX2 -sfs $SFSPRIOR -fstout $OUTFILE"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
+
+--- end bash code ---
+
+## ---------- GENETIC DIVERSITY ---------- ## TL TODO
 
 ## ---------- PRINCIPAL COMPONENT ANALYSIS ---------- ##
+
+# Estimate genetic covariance between individuals
+
+
+
+# Calculate eigen vectors and values and visualize PCA
 
 covar <- as.matrix(read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/pca/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_unweighted.covar',head=FALSE))
 eig <- eigen(covar)
