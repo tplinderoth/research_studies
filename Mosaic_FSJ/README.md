@@ -15,5 +15,6 @@ from genetic data is part of [PopGenomicsTools](https://github.com/tplinderoth/P
 ### Data
 
 Whole genome sequence data are available on the Sequence Read Archive under BioProject accession PRJNA1099469.
-All other data used in this study are publicly available on Dryad: <https://doi.org/10.5061/dryad.z612jm6j0>
+<br>
+All other data used in this study are publicly available on Dryad: <https://doi.org/10.5061/dryad.z612jm6j0> <br>
 Dryad data direct download link for peer review: https://datadryad.org/stash/share/N9nVcn5FswfB57nIidF-bFWMrbw3kjjG_F0iOPcpMqw
