@@ -1,4 +1,4 @@
-Resources for the study "translocations spur population growth but exacerbate inbreeding 
+Resources for the study "Translocations spur population growth but exacerbate inbreeding 
 in an imperiled species" by Linderoth *et al*.
 ========================================================================================
 
