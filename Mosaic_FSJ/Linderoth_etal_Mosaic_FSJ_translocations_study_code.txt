@@ -144,6 +144,40 @@ biopoint <- function(x = NULL) {
 	return(as.numeric(ptcode))
 }
 
+h_boxplot2 <- function(x=NULL, n=NULL, lev=grplevels, ylabel="Heterozygosity", pntlab=NULL, seed=10287, color=NULL, ylimits=NULL, idlabels=NULL) {
+	if (length(grep("TeachingDemos",(.packages()))) == 0) library(TeachingDemos) # for shadowtext()
+	nlevel = length(lev)
+
+	par(mar=c(5,5,2,2))
+	boxplot(x[,n] ~ group, data=x, outline=FALSE, names=c(rep("",nlevel)), xlab="", ylab=ylabel, main="", col="gray80", cex.axis=1.5, cex.lab=1.5, lwd=2, ylim=ylimits)
+	mtext(c(lev[1:3],paste("Other","M4",sep="\n")), 1,at=1:nlevel, padj=1, cex=1.5)
+
+	# add points
+	for (i in lev) {
+		idx = which(as.character(x$group) == i)
+		set.seed(seed)
+		xjitter = jitter(rep(which(lev == i),length(idx)), amount=0.2)
+		ptcol = NULL
+		for (j in 1:length(idx)) {
+			if (is.null(color)) ptcol = alpha("maroon",0.5) else ptcol = alpha(color[idx[j]],0.5)
+			if (is.null(pntlab) || is.na(pntlab[idx[j]])) {
+				if (!is.null(idlabels)) {
+				  text(y=x[idx[j],n], x=xjitter[j],idlabels[idx[j]],cex=0.5,col="red")
+				} else {
+				  points(y=x[idx[j],n], x=xjitter[j], pch=1, cex=1.2)
+				  points(y=x[idx[j],n], x=xjitter[j], pch=16, cex=1.2, col=ptcol)
+				}
+			} else if (class(pntlab) == "numeric") {
+				points(y=x[idx[j],n], x=xjitter[j], pch=pntlab[idx[j]], col="black", bg=alpha(color[idx[j]],0.65),lwd=1.3,cex=1.5)
+			}  else if (class(pntlab) == "character") {
+				shadowtext(y=x[idx[j],n], x=xjitter[j], labels=pntlab[idx[j]], col=color[idx[j]], bg=alpha("black",0.5), r=0.07, cex=1.2)	
+			} else stop("Unknown argument to pntlab")
+		}
+	}
+
+}
+
+
 ## ---------- RAW FASTQ QUALITY CONTROL ---------- ##
 
 ## Assess quality of raw fastq files
@@ -816,11 +850,162 @@ tabix -p vcf $OUTVCF
 --- end bash code ---
 
 
-## ---------- RELATEDNESS ESTIMATED FROM GENOMIC DATA ---------- ## TL TODO
+## ---------- RELATEDNESS ESTIMATED FROM GENOMIC DATA ---------- ##
+
+Estimate relatedness among all sequenced individuals.
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/relatedness_qc_snps.sh
+implements:
+
+--- start bash code ---
+
+VCF='/mnt/research/Fitz_Lab/projects/mosaic/variants/vcf/biallelic_snps/fsj_mosaic_biallelic_snps_main_autosomes_qc.vcf.gz'
+OUTFILE='fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness.txt'
+
+CMD="ngsRelate -h $VCF -O $OUTFILE -p 20 -l 0.02 -T PL -A AF"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
+
+--- end bash code ---
+
+## Subset individuals such that all pairwise relatedness within each group is <= 0.4, which should exclude any first degree relatives.
+## These subsets are maximally large, while ensuring that r <= 0.4.
+## These are the subsets used for estimating average heterozygosity and estimating allele frequencies for inbreeding inferences.
+
+Groups (Unrelated := r < 0.4) and subset sample sizes:
+-Unrelated Contemporary CR group (n = 28)
+-Unrelated Resident CR group (n = 14)
+-Site 13 group (n = 10)
+-Unrelated Historic metapopulation group (n = 39)
+-Unrelated CR founders (Resident + translocated, n = 29)
+-donor sites (includes translocated individuals) (n = 16)
+
+Extract relatedness submatrices that include only the individuals within each group
+
+--- start R code ---
+
+rmat <- as.matrix(read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix.txt',head=TRUE,row.names=1))
+colnames(rmat) <- gsub('\\..+$', '', colnames(rmat), perl=TRUE) # remove location info
+meta <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
+
+# collect IDs of individuals in each group
+c.id <- meta$LAB_ID[which(meta$pop == "Contemporary")]
+r.id <- meta$LAB_ID[which(meta$pop == "Resident")]
+s13.id <- meta$LAB_ID[which(meta$pop == "SITE_13")]
+histmeta.id <- meta$LAB_ID[which(meta$year_sampled < 2021)]
+
+# note: exclude RSW-K from CR founders in case I use them as a reference pop for the Contemporary CR individuals at some point
+crfounders.id <- meta$LAB_ID[which((meta$pop == "Resident" | meta$pop == "SITE_1" | meta$pop == "SITE_12" | meta$pop == "SITE_13" | meta$pop == "SITE_18" | meta$pop == "TEXACO") & meta$LAB_ID != "T_072")]
+
+# note: include RSW-K from the donor site group because they are relevant for estimating the allele frequencies in this metapopulation subset
+donor.id <- meta$LAB_ID[which(meta$pop == "SITE_1" | meta$pop == "SITE_12" | meta$pop == "SITE_13" | meta$pop == "SITE_18" | meta$pop == "TEXACO")]
+
+# commenting out translocated subset below because all donor site individuals are a better way to estimate allele frequencies for the translocated group 
+#trans.id <': trans.id <- meta$LAB_ID[which((meta$pop == "SITE_1" | meta$pop == "SITE_12" | meta$pop == "SITE_13" | meta$pop == "SITE_18" | meta$pop == "TEXACO") & meta$LAB_ID != "T_072")]
+
+# extract relatedness matrix subsets
+c.rmat <- rmat[which(colnames(rmat) %in% c.id == TRUE), which(colnames(rmat) %in% c.id == TRUE)]
+r.rmat <- rmat[which(colnames(rmat) %in% r.id == TRUE), which(colnames(rmat) %in% r.id == TRUE)]
+s13.rmat <- rmat[which(colnames(rmat) %in% s13.id == TRUE), which(colnames(rmat) %in% s13.id == TRUE)]
+histmeta.rmat <- rmat[which(colnames(rmat) %in% histmeta.id == TRUE), which(colnames(rmat) %in% histmeta.id == TRUE)]
+crfounders.rmat <- rmat[which(colnames(rmat) %in% crfounders.id == TRUE), which(colnames(rmat) %in% crfounders.id == TRUE)]
+donor.rmat <- rmat[which(colnames(rmat) %in% donor.id == TRUE), which(colnames(rmat) %in% donor.id == TRUE)]
+
+# output relatedness matrices subsets
+#write.table(c.rmat, file='/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/contemporary_cr_relatedness_matrix.txt', col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
+#write.table(r.rmat, file='/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/resident_cr_relatedness_matrix.txt', col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
+#write.table(s13.rmat, file='/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/site13_relatedness_matrix.txt', col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
+#write.table(histmeta.rmat, file='/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/historic_metapop_relatedness_matrix.txt', col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
+#write.table(crfounders.rmat, file='/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/cr_founders_relatedness_matrix.txt', col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
+#write.table(donor.rmat, file='/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/donor_pops_relatedness_matrix.txt', col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
+
+# output the original relatedness matrix of all samples, entirely unchanged except for removing the row names and simplifying the IDs (remove population labels)
+#write.table(rmat, file='/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix_fmt.txt', col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
+
+--- end R code ---
+
+Take random subsets of individuals such that the max pairwise r within each group is <= 0.4
+
+--- start bash code ---
+
+$ /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/scripts/subsetUnrelated.R contemporary_cr_relatedness_matrix.txt 0.4 836241 > contemporary_cr_relatedness_maxr0.4_ids.txt
+$ /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/scripts/subsetUnrelated.R resident_cr_relatedness_matrix.txt 0.4 836241 > resident_cr_relatedness_maxr0.4_ids.txt
+$ /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/scripts/subsetUnrelated.R site13_relatedness_matrix.txt 0.4 836241 > site13_relatedness_maxr0.4_ids.txt
+$ /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/scripts/subsetUnrelated.R historic_metapop_relatedness_matrix.txt 0.4 836241 > historic_metapop_relatedness_maxr0.4_ids.txt
+$ /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/scripts/subsetUnrelated.R cr_founders_relatedness_matrix.txt 0.4 836241 > cr_founders_relatedness_maxr0.4_ids.txt
+$ /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/scripts/subsetUnrelated.R donor_pops_relatedness_matrix.txt 0.4 836241 > donor_pops_relatedness_maxr0.4_ids.txt
+$ /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/scripts/subsetUnrelated.R fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix_fmt.txt 0.4 836241 > fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_maxr0.4_ids.txt
+
+--- end bash code ---
+
+## Take random subsets of individuals so that all within-group pairwise relatedness is <= 0.01
+## Consider these subsets of unrelated individuals.
+
+--- begin R code ---
+
+sample_unrelated <- function(pop, relate.matrix, maxr=0.01, niter=100) {
+
+        grp.idx <- grep(pop,colnames(relate.matrix))
+        urelate = NULL
+
+        for (i in 1:niter) {
+                submat = relate.matrix[grp.idx,grp.idx]
+                while (max(submat,na.rm=TRUE) > maxr) {
+                        id = colnames(submat)
+                        ind.pairs <- combn(id, m=2)
+                        idx.perm <- sample(1:ncol(ind.pairs),size=ncol(ind.pairs))
+                        reset = 0
+                        for (i in idx.perm) {
+                                ind.vec = ind.pairs[,i]
+                                a.idx = which(id == ind.vec[1])
+                                b.idx = which(id == ind.vec[2])
+                                r = relate.matrix[a.idx, b.idx]
+                                if (r > maxr) {
+                                        a.relatives = length(which(submat[a.idx,] > maxr))
+                                        b.relatives = length(which(submat[b.idx,] > maxr))
+                                        discard.idx = ifelse(a.relatives > b.relatives, a.idx, b.idx)
+                                        submat <- submat[-discard.idx, -discard.idx]
+                                        reset = 1
+                                        break
+                                }
+                                if (reset == 1) break
+                        }
+                }
+                if (is.null(urelate) == TRUE || ncol(submat) > ncol(urelate)) urelate = submat
+        }
+
+        return(colnames(urelate))
+}
+
+rmat <- as.matrix(read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix.txt',head=TRUE,row.names=1))
+rmat <- rmat[-which(colnames(rmat) == "T_072.Site_1"),-which(colnames(rmat) == "T_072.Site_1")] # exclude RSW-K because this individual was not translocated
+
+set.seed(324986)
+contemp.unrelated <- sample_unrelated(pop="Contemporary", relate.matrix=rmat, maxr=0.01, niter=1000) # unrelated contemporary CR subset
+res.unrelated <- sample_unrelated(pop="Resident", relate.matrix=rmat, maxr=0.01, niter=1000) # unrelated resident CR subset
+trans.unrelated <- sample_unrelated(pop="Site|Texaco", relate.matrix=rmat, maxr=0.01, niter=1000) # unrelated translocated subset
+
+contemp.unrelated.df  <- data.frame(ID=gsub("\\.Contemporary","",contemp.unrelated))
+res.unrelated.df  <- data.frame(ID=gsub("\\.Resident","",res.unrelated))
+trans.unrelated.df <- data.frame(ID=gsub("\\.Site.+|\\.Texaco","",trans.unrelated))
+
+# write subset lists of individuals for which all r <= 0.01
+#write.table(contemp.unrelated.df, file='/home/tyler/Dropbox/research/jay/mosaic/popgen/unrelated_subsample/contemporary_unrelated_samples.txt',col.names=FALSE,row.names=FALSE,quote=FALSE)
+#write.table(res.unrelated.df, file='/home/tyler/Dropbox/research/jay/mosaic/popgen/unrelated_subsample/resident_unrelated_samples.txt',col.names=FALSE,row.names=FALSE,quote=FALSE)
+#write.table(trans.unrelated.df, file='/home/tyler/Dropbox/research/jay/mosaic/popgen/unrelated_subsample/translocated_unrelated_samples.txt',col.names=FALSE,row.names=FALSE,quote=FALSE)
+
+--- end R code ---
+
+Unrelated (r <= 0.01) sample sizes:
+contemporary CR, n = 6
+resident CR, n = 6
+translocated, n = 8
 
 ## ---------- SITE FREQUENCY SPECTRUM ---------- ##
 
-# Folded SFS calculated from all sites (best SFS estimate, used for estimating diversity)
+# Folded SFS calculated from all sites (best SFS estimate, used for estimating genetic diversity)
 
 Estimate per site allele frequency likelihoods for all quality controlled sites
 
@@ -829,7 +1014,7 @@ implements:
 
 --- start bash code ---
 
-GRP_ARR=('resident' 'C')
+GRP_ARR=('resident' 'C' 'T' 'M4')
 FSJGRP="${GRP_ARR[$SLURM_ARRAY_TASK_ID]}"
 BAMLIST="/mnt/research/Fitz_Lab/projects/mosaic/map/mosaic_${FSJGRP}_bam_list.txt"
 OUTPREFIX="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_allsites_main_autosomes_qc_${FSJGRP}"
@@ -852,12 +1037,60 @@ implements:
 
 --- start bash code ---
 
-GRP_ARR=('resident' 'C')
+GRP_ARR=('resident' 'C' 'T' 'M4')
 FSJGRP="${GRP_ARR[$SLURM_ARRAY_TASK_ID]}"
 SAFIDX="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_allsites_main_autosomes_qc_${FSJGRP}.saf.idx"
 OUTSFS="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_allsites_main_autosomes_qc_${FSJGRP}.fold.sfs"
 
 CMD="realSFS $SAFIDX -fold 1 -P 20 > $OUTSFS"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
+
+--- end bash code ---
+
+# Folded SFS calculated using all sites for subsets of individuals for which all pairwise relatedness is <= 0.01
+
+Estimate allele frequency likelihoods for subset of unrelated individuals at all quality-controlled sites
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/main_autosome_unrelated_grp_array.sh
+implements:
+
+--- start bash code ---
+
+GRP_ARR=('contemporary' 'resident' 'translocated')
+FSJGRP="${GRP_ARR[$SLURM_ARRAY_TASK_ID]}"
+BAMLIST="/mnt/research/Fitz_Lab/projects/mosaic/map/unrelated/${FSJGRP}_unrelated_bam_list.txt"
+OUTPREFIX="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_allsites_main_autosomes_qc_${FSJGRP}_unrelated"
+FFILE="/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/unrelated/${FSJGRP}_unrelated_samples_F.txt"
+REGFILE='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ_V3_main_autosomes.txt'
+SITESFILE='/mnt/research/Fitz_Lab/projects/mosaic/variants/vcf/all_sites/fsj_mosaic_allsites_main_autosomes_qc.pos'
+REF='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ.V3.fa'
+
+CMD="angsd -bam $BAMLIST -out $OUTPREFIX -GL 1 -doSaf 2 -indF $FFILE -anc $REF -doMaf 1 -doMajorMinor 1 -minQ 20 -minMapQ 20 -rf $REGFILE -sites $SITESFILE -P 4"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
+
+--- end bash code ---
+
+Note: GitHub version of /mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/main_autosome_unrelated_grp_array.sh 
+is called main_autosome_unrelated_grp_sfs_array.sh.
+
+Estimate the SFS for subsets of unrelated individuals based on all quality-controlled sites
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/main_autosome_unrelated_grp_realsfs_fold_array.sh
+
+--- start bash code ---
+
+GRP_ARR=('contemporary' 'resident' 'translocated')
+FSJGRP="${GRP_ARR[$SLURM_ARRAY_TASK_ID]}"
+SAFIDX="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_allsites_main_autosomes_qc_${FSJGRP}_unrelated.saf.idx"
+OUTSFS="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_allsites_main_autosomes_qc_${FSJGRP}_unrelated.fold.sfs"
+
+CMD="realSFS $SAFIDX -fold 1 -P 16 > $OUTSFS"
 
 printf "\n%s\n\n" "$CMD"
 
@@ -1030,13 +1263,777 @@ eval $CMD
 
 --- end bash code ---
 
-## ---------- GENETIC DIVERSITY ---------- ## TL TODO
+## ---------- GENETIC DIVERSITY ---------- ##
+
+## Heterozygosity
+
+Estimate heterozygosity from each individual's site frequency spectrum.
+
+# Estimate allele frequency (0, 1, or 2 minor alleles) likelihoods at each site
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/theta/heterozygosity/heterozygosity_array.sh
+implements:
+
+--- start bash code ---
+
+BAMLIST='/mnt/research/Fitz_Lab/projects/mosaic/map/mosaic_bam_list.txt'
+BAMFILE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$BAMLIST")
+SAMPLIST='/mnt/research/Fitz_Lab/projects/mosaic/mosiac_ids.txt'
+SAMP=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$SAMPLIST")
+REF='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ.V3.fa'
+REGFILE='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ_V3_main_autosomes.txt'
+SITESFILE='/mnt/research/Fitz_Lab/projects/mosaic/variants/vcf/all_sites/fsj_mosaic_allsites_main_autosomes_qc.pos'
+OUTPREFIX="/mnt/research/Fitz_Lab/projects/mosaic/popgen/theta/heterozygosity/fsj_mosaic_allsites_main_autosomes_qc_${SAMP}"
+
+SAFCMD="angsd -i $BAMFILE -out $OUTPREFIX -GL 1 -doSaf 1 -anc $REF -minQ 20 -minMapQ 20 -rf $REGFILE -sites $SITESFILE"
+
+printf "\n%s\n\n" "$SAFCMD"
+
+eval $SAFCMD
+
+--- end bash code ---
+
+# Estimate SFS for individuals
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/theta/heterozygosity/heterozygosity_realsfs_array.sh
+implements:
+
+--- start bash code ---
+
+SAMPLIST='/mnt/research/Fitz_Lab/projects/mosaic/mosiac_ids.txt'
+SAMP=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$SAMPLIST")
+SAFIDX="/mnt/research/Fitz_Lab/projects/mosaic/popgen/theta/heterozygosity/fsj_mosaic_allsites_main_autosomes_qc_${SAMP}.saf.idx"
+SFS="/mnt/research/Fitz_Lab/projects/mosaic/popgen/theta/heterozygosity/fsj_mosaic_allsites_main_autosomes_qc_${SAMP}.fold.sfs"
+
+CMD="realSFS $SAFIDX -fold 1 -P 12 > $SFS"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
+
+--- end bash code ---
+
+Collect SFS for all samples into a single file
+
+--- begin bash code ---
+
+$ for i in {1..87}; do SAMP=$(sed -n "${i}p" /mnt/research/Fitz_Lab/projects/mosaic/mosiac_ids.txt); sfs=$((printf "%s " "$SAMP" && head -n1 fsj_mosaic_allsites_main_autosomes_qc_${SAMP}.fold.sfs) | tr ' ' \\t | cut -f1-3); echo "$sfs" >> fsj_mosaic_allsites_main_autosomes_qc_all.fold.sfs; done
+
+--- end bash code ---
+
+# Calculate H from individual SFS and visualize H distrubutions with boxplots
+
+--- start R code ---
+
+library(scales) # for alpha
+
+# read in metapop data
+meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
+meta$popletter <- popletters(meta)
+meta$popcol <- popcolor(meta)
+
+groups <- meta$pop
+grplevels <- c("Contemporary", "Resident", "Translocated", "M4")
+
+groups <- replace(groups, which(groups == "Golden_Aster_Scrub" | groups == "Brigman" | groups == "W.Balm" | 
+groups == "Duette_headwaters" | groups == "Sun_City"), "M4")
+
+groups <- replace(groups, which(groups == "SITE_1" | groups == "SITE_12" | groups == "SITE_13" | 
+groups == "SITE_18" | groups == "TEXACO"), "Translocated")
+
+allsites <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/theta/fsj_mosaic_allsites_main_autosomes_qc_all.fold.sfs',head=FALSE) # H all sites
+
+## calculate H
+allsites$H <- sapply(1:nrow(allsites), function(x,df){df[x,3]/sum(df[x,2:3])},df=allsites)
+allsites$group = factor(groups,levels=grplevels)
+
+# omit T_072 (RSW-K) from plots and statistical tests because this site 1 bird was not translocated and migrated to LMSP, which is outside of the Core
+allsites <- allsites[-which(allsites$V1 == "T_072"),]
+meta <- meta[-which(meta$LAB_ID == "T_072"),]
+
+## H boxplots
+
+# set point type
+pointcode <- meta$popletter
+pointcode <- replace(pointcode, which(pointcode == "C" | pointcode == "R"),NA)
+allsites$biopoint = biopoint(meta$pop)
+snps$biopoint = biopoint(meta$pop)
+
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/H_distribution.png',width=7, height=7,units='in', res=300)
+h_boxplot2(x=allsites, n=4, lev=grplevels, ylabel="Heterozygosity per site", pntlab=allsites$biopoint, seed=10287, color=meta$popcol, ylimits=NULL)
+dev.off()
+
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/H_distribution_text.png',width=7, height=7,units='in', res=300)
+h_boxplot2(x=allsites, n=4, lev=grplevels, ylabel="Heterozygosity per site", pntlab=NULL, seed=10287, color=meta$popcol, ylimits=NULL, idlabels=allsites$V1)
+dev.off()
+
+## write H results
+allsites$pop <- meta$pop
+colnames(allsites) <- c("SAMPLE", "N_HOMO_SITES", "N_HET_SITES", "H", "CLASS", "POPULATION")
+#write.table(allsites,file='/home/tyler/Dropbox/research/jay/mosaic/popgen/theta/fsj_mosaic_allsites_main_autosomes_qc_all.fold.sfs.het2',col.names=TRUE,row.names=FALSE,quote=FALSE,sep="\t")
+
+## summarize heterozygosity and test for differences between groups with first degree relatives excluded, specifically no pairwise r > 0.4
+
+contemp.unrelate <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/inputs/contemporary_cr_relatedness_maxr0.4_ids.txt', head=FALSE)$V1 # this is all contemporary individuals because all pairwise relatedness was < 0.4
+res.unrelate <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/inputs/resident_cr_relatedness_maxr0.4_ids.txt', head=FALSE)$V1
+donor.unrelate <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/inputs/donor_pops_relatedness_maxr0.4_ids.txt', head=FALSE)$V1
+histmeta.unrelate <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/inputs/historic_metapop_relatedness_maxr0.4_ids.txt', head=FALSE)$V1
+
+# Group H summary stats (individuals comprising groups are subsets such that all pairwise r <= 0.4).
+
+# Contemporary (all pairwise r <= 0.4)
+mean(allsites$H[which(allsites$CLASS == "Contemporary" & allsites$SAMPLE %in% contemp.unrelate == TRUE)])
+#[1] 0.0002010206
+sd(allsites$H[which(allsites$CLASS == "Contemporary" & allsites$SAMPLE %in% contemp.unrelate == TRUE)])
+#[1] 1.846997e-05
+range(allsites$H[which(allsites$CLASS == "Contemporary" & allsites$SAMPLE %in% contemp.unrelate == TRUE)])
+#[1] 0.0001593255 0.0002332972
+
+# Resident (all pairwise r <= 0.4)
+mean(allsites$H[which(allsites$CLASS == "Resident" & allsites$SAMPLE %in% res.unrelate == TRUE)])
+#[1] 0.0002306068
+sd(allsites$H[which(allsites$CLASS == "Resident" & allsites$SAMPLE %in% res.unrelate == TRUE)])
+#[1] 2.077982e-05
+range(allsites$H[which(allsites$CLASS == "Resident" & allsites$SAMPLE %in% res.unrelate == TRUE)])
+#[1] 0.0001854781 0.0002576843
+
+# Translocated (all pairwise r <= 0.4)
+mean(allsites$H[which(allsites$CLASS == "Translocated" & allsites$SAMPLE %in% donor.unrelate == TRUE)])
+#[1] 0.0002138821
+sd(allsites$H[which(allsites$CLASS == "Translocated" & allsites$SAMPLE %in% donor.unrelate == TRUE)])
+#[1] 3.394935e-05
+range(allsites$H[which(allsites$CLASS == "Translocated" & allsites$SAMPLE %in% donor.unrelate == TRUE)])
+#[1] 0.0001607426 0.0002839456
+
+# Other M4
+mean(allsites$H[which(allsites$CLASS == "M4" & allsites$SAMPLE %in% histmeta.unrelate == TRUE)])
+#[1] 0.0002429067
+sd(allsites$H[which(allsites$CLASS == "M4" & allsites$SAMPLE %in% histmeta.unrelate == TRUE)])
+#[1] 3.167934e-05
+range(allsites$H[which(allsites$CLASS == "M4" & allsites$SAMPLE %in% histmeta.unrelate == TRUE)])
+#[1] 0.0001966109 0.0003019788
+
+# H for samples (for which all pairwise r <= 0.4) is normally distributed
+
+shapiro.test(allsites$H[which(allsites$CLASS == "Contemporary" & allsites$SAMPLE %in% contemp.unrelate == TRUE)])
+#
+#	Shapiro-Wilk normality test
+#
+#data:  allsites$H[which(allsites$group == "Contemporary" & allsites$SAMPLE %in% contemp.unrelate == TRUE)]
+#W = 0.96952, p-value = 0.5679
+
+shapiro.test(allsites$H[which(allsites$CLASS == "Resident" & allsites$SAMPLE %in% res.unrelate == TRUE)])
+#
+#	Shapiro-Wilk normality test
+#
+#data:  allsites$H[which(allsites$group == "Resident" & allsites$SAMPLE %in% res.unrelate == TRUE)]
+#W = 0.95371, p-value = 0.6196
+
+shapiro.test(allsites$H[which(allsites$CLASS == "Translocated" & allsites$SAMPLE %in% donor.unrelate == TRUE)])
+#
+#	Shapiro-Wilk normality test
+#
+#data:  allsites$H[which(allsites$group == "Translocated" & allsites$SAMPLE %in% donor.unrelate == TRUE)]
+#W = 0.97319, p-value = 0.9022
+
+shapiro.test(allsites$H[which(allsites$CLASS == "M4" & allsites$SAMPLE %in% histmeta.unrelate == TRUE)])
+#
+#	Shapiro-Wilk normality test
+#
+#data:  allsites$H[which(allsites$group == "M4" & allsites$SAMPLE %in% histmeta.unrelate == TRUE)]
+#W = 0.96109, p-value = 0.8096
+
+# Test for differences in mean H between groups after having removed relatedness > 0.4
+
+# Contemporary CR vs Resident CR
+t.test(x=allsites$H[which(allsites$CLASS == "Contemporary" & allsites$SAMPLE %in% contemp.unrelate == TRUE)], y=allsites$H[which(allsites$CLASS == "Resident" & allsites$SAMPLE %in% res.unrelate == TRUE)], alternative="two.sided")
+#
+#	Welch Two Sample t-test
+#
+#data:  allsites$H[which(allsites$CLASS == "Contemporary" & allsites$SAMPLE %in% contemp.unrelate == TRUE)] and allsites$H[which(allsites$CLASS == "Resident" & allsites$SAMPLE %in% res.unrelate == TRUE)]
+#t = -4.5105, df = 23.531, p-value = 0.0001503
+#alternative hypothesis: true difference in means is not equal to 0
+#95 percent confidence interval:
+# -4.313854e-05 -1.603385e-05
+#sample estimates:
+#   mean of x    mean of y 
+#0.0002010206 0.0002306068
+
+# Contemporary CR vs translocated
+t.test(x=allsites$H[which(allsites$CLASS == "Contemporary" & allsites$SAMPLE %in% contemp.unrelate == TRUE)], y=allsites$H[which(allsites$CLASS == "Translocated" & allsites$SAMPLE %in% donor.unrelate == TRUE)], alternative="two.sided")
+#
+#	Welch Two Sample t-test
+#
+#data:  allsites$H[which(allsites$CLASS == "Contemporary" & allsites$SAMPLE %in% contemp.unrelate == TRUE)] and allsites$H[which(allsites$CLASS == "Translocated" & allsites$SAMPLE %in% donor.unrelate == TRUE)]
+#t = -1.3632, df = 18.55, p-value = 0.1892
+#alternative hypothesis: true difference in means is not equal to 0
+#95 percent confidence interval:
+# -3.264187e-05  6.918801e-06
+#sample estimates:
+#   mean of x    mean of y 
+#0.0002010206 0.0002138821
+
+# Resident CR versus translocated
+t.test(x=allsites$H[which(allsites$CLASS == "Resident" & allsites$SAMPLE %in% res.unrelate == TRUE)], y=allsites$H[which(allsites$CLASS == "Translocated" & allsites$SAMPLE %in% donor.unrelate == TRUE)], alternative="two.sided")
+#
+#	Welch Two Sample t-test
+#
+#data:  allsites$H[which(allsites$CLASS == "Resident" & allsites$SAMPLE %in% res.unrelate == TRUE)] and allsites$H[which(allsites$CLASS == "Translocated" & allsites$SAMPLE %in% donor.unrelate == TRUE)]
+#t = 1.6117, df = 23.43, p-value = 0.1204
+#alternative hypothesis: true difference in means is not equal to 0
+#95 percent confidence interval:
+# -4.719847e-06  3.816916e-05
+#sample estimates:
+#   mean of x    mean of y 
+#0.0002306068 0.0002138821
+
+--- end R code ---
+
+## Watterson's Theta and nucleotide diversity
+
+--- start R code ---
+
+grps = c("C", "contemporary_unrelated", "resident", "resident_unrelated", "T", "translocated_unrelated", "M4")
+
+# T' is actually donor sites because it includes T_072 (RSW-K) who was from Site 1 but not translocated,
+# 'translocated_unrelated' are just translocated jays.
+# 'unrelated' groups are subsets of individuals for which all pairwise relatedness is <= 0.01
+
+fprefix="/mnt/research/Fitz_Lab/projects/mosaic/popgen/theta/fsj_mosaic_allsites_main_autosomes_qc"
+
+df = NULL
+for (g in grps) {
+        theta <- read.table(paste0(fprefix,"_",g,".thetas.idx.pestPG"))
+        nsites = sum(theta[,14])
+        theta$wt = theta[,14]/nsites
+        df=rbind(df, data.frame(Group=g, Theta_Watterson = sum(theta[,4])/nsites, Pi = sum(theta[,5])/nsites, TajimaD = sum(theta[,9]*theta$wt)))
+}
+
+# write output
+#write.table(df,file='/mnt/research/Fitz_Lab/projects/mosaic/popgen/theta/fsj_mosaic_allsites_main_autosomes_qc_genome_all_groups.thetas', col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
+
+--- end R code ---
+
+Reported thetas estimated using all contemporary CR and all resident CR individuals in the manuscript.
+
+## ---------- INBREEDING NGSF ---------- ##
+
+## Individual inbreeding based on deviation from Hardy-Weinberg Equilibrium genotype frequencies
+
+The following describes calculating individual inbreeding coefficients, F, with ngsF based on allele frequencies 
+for the population specific to sets of individuals. Allele frequencies were estimated for groups for which at least 
+10 individuals were sampled after subsetting such that all within-group pairwise r <= 0.4.
+
+# Calculate genotype likelihoods for populations
+
+Genotype likelihoods for the Contemporary CR population
+
+$sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/contemporary_binary_gl.sh
+implements:
+
+--- start bash code ---
+
+BAMLIST='/mnt/research/Fitz_Lab/projects/mosaic/map/population_specific_bam_lists/contemporary_cr_bams.txt'
+REGFILE='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ_V3_main_autosomes.txt'
+SITESFILE='/mnt/research/Fitz_Lab/projects/mosaic/variants/vcf/biallelic_snps/fsj_mosaic_biallelic_snps_main_autosomes_qc.pos'
+OUTPREFIX='/mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/contemporary_cr_biallelic_snps_main_autosomes_qc_glf3'
+
+angsd -bam $BAMLIST -out $OUTPREFIX -GL 1 -doGlf 3 -doMaf 1 -doMajorMinor 1 -SNP_pval 1e-4 -minQ 20 -minMapQ 20 -remove_bads 1 -only_proper_pairs 1 -uniqueOnly 1 -rf $REGFILE -sites $SITESFILE -P 16
+
+--- end bash code ---
+
+Genotype likelihoods for the resident CR population
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/resident_binary_gl.sh
+implements:
+
+--- start bash code ---
+
+BAMLIST='/mnt/research/Fitz_Lab/projects/mosaic/map/population_specific_bam_lists/resident_cr_bams.txt'
+REGFILE='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ_V3_main_autosomes.txt'
+SITESFILE='/mnt/research/Fitz_Lab/projects/mosaic/variants/vcf/biallelic_snps/fsj_mosaic_biallelic_snps_main_autosomes_qc.pos'
+OUTPREFIX='/mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/resident_cr_biallelic_snps_main_autosomes_qc_glf3'
+
+angsd -bam $BAMLIST -out $OUTPREFIX -GL 1 -doGlf 3 -doMaf 1 -doMajorMinor 1 -SNP_pval 1e-4 -minQ 20 -minMapQ 20 -remove_bads 1 -only_proper_pairs 1 -uniqueOnly 1 -rf $REGFILE -sites $SITESFILE -P 16
+
+--- end bash code ---
+
+Genotype likelihoods for the donor population individuals
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/donor_pop_binary_gl.sh
+implements:
+
+--- start bash code ---
+
+BAMLIST='/mnt/research/Fitz_Lab/projects/mosaic/map/population_specific_bam_lists/donor_pop_bams.txt'
+REGFILE='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ_V3_main_autosomes.txt'
+SITESFILE='/mnt/research/Fitz_Lab/projects/mosaic/variants/vcf/biallelic_snps/fsj_mosaic_biallelic_snps_main_autosomes_qc.pos'
+OUTPREFIX='/mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/donor_pops_biallelic_snps_main_autosomes_qc_glf3'
+
+angsd -bam $BAMLIST -out $OUTPREFIX -GL 1 -doGlf 3 -doMaf 1 -doMajorMinor 1 -SNP_pval 1e-4 -minQ 20 -minMapQ 20 -remove_bads 1 -only_proper_pairs 1 -uniqueOnly 1 -rf $REGFILE -sites $SITESFILE -P 16
+
+--- end bash code ---
+
+Genotype likelihoods for all historic (jays sampled from 2003-2008) M4 metapopulation individuals
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/historic_metapop_binary_gl.sh
+implements:
+
+--- start bash code ---
+
+BAMLIST='/mnt/research/Fitz_Lab/projects/mosaic/map/population_specific_bam_lists/historic_metapopulation_bams.txt'
+REGFILE='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ_V3_main_autosomes.txt'
+SITESFILE='/mnt/research/Fitz_Lab/projects/mosaic/variants/vcf/biallelic_snps/fsj_mosaic_biallelic_snps_main_autosomes_qc.pos'
+OUTPREFIX='/mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/historic_metapop_biallelic_snps_main_autosomes_qc_glf3'
+
+angsd -bam $BAMLIST -out $OUTPREFIX -GL 1 -doGlf 3 -doMaf 1 -doMajorMinor 1 -SNP_pval 1e-4 -minQ 20 -minMapQ 20 -remove_bads 1 -only_proper_pairs 1 -uniqueOnly 1 -rf $REGFILE -sites $SITESFILE -P 16
+
+--- end bash code ---
+ 
+Genotype likelihoods for Site 13
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/site13_binary_gl.sh
+implements:
+
+--- start bash code ---
+
+BAMLIST='/mnt/research/Fitz_Lab/projects/mosaic/map/population_specific_bam_lists/site13_bams.txt'
+REGFILE='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ_V3_main_autosomes.txt'
+SITESFILE='/mnt/research/Fitz_Lab/projects/mosaic/variants/vcf/biallelic_snps/fsj_mosaic_biallelic_snps_main_autosomes_qc.pos'
+OUTPREFIX='/mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/site13_biallelic_snps_main_autosomes_qc_glf3'
+
+angsd -bam $BAMLIST -out $OUTPREFIX -GL 1 -doGlf 3 -doMaf 1 -doMajorMinor 1 -SNP_pval 1e-4 -minQ 20 -minMapQ 20 -remove_bads 1 -only_proper_pairs 1 -uniqueOnly 1 -rf $REGFILE -sites $SITESFILE -P 16
+
+--- end bash code ---
+
+# Calculate inbreeding coefficients with ngsF
+
+Calculate inbreeding coefficient for Contemporary CR individuals using Contemporary CR allele frequencies
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/contemporary_inbreed_coef.sh
+implements:
+
+--- start bash code ---
+
+GENOLIKES='/mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/contemporary_cr_biallelic_snps_main_autosomes_qc_glf3.glf'
+OUTFILE='/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/contemporary_cr_biallelic_snps_main_autosomes_qc_F.txt'
+
+CMD="ngsF --glf $GENOLIKES --init_values e --out $OUTFILE --n_ind 28 --n_sites 1347940 --max_iters 3000 --n_threads 20"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
+
+--- end bash code ---
+
+Calculate inbreeding coefficient for Resident CR individuals using Resident CR allele frequencies
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/resident_inbreed_coef.sh
+implements:
+
+--- start bash code ---
+
+GENOLIKES='/mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/resident_cr_biallelic_snps_main_autosomes_qc_glf3.glf'
+OUTFILE='/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/resident_cr_biallelic_snps_main_autosomes_qc_F.txt'
+
+CMD="ngsF --glf $GENOLIKES --init_values e --out $OUTFILE --n_ind 16 --n_sites 1204026 --max_iters 3000 --n_threads 20"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
+
+--- end bash code ---
+
+Calculate inbreeding coefficient for Site 13 individuals using Site 13 allele frequencies
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/site13_inbreed_coef.sh
+implements:
+
+--- start bash code ---
+
+GENOLIKES='/mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/site13_biallelic_snps_main_autosomes_qc_glf3.glf'
+OUTFILE='/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/site13_biallelic_snps_main_autosomes_qc_F.txt'
+
+CMD="ngsF --glf $GENOLIKES --init_values e --out $OUTFILE --n_ind 19 --n_sites 919620 --max_iters 3000 --n_threads 20"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
+
+--- end bash code ---
+
+Calculate inbreeding coefficient for donor site individuals using pooled donor site allele frequencies
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/donor_pops_inbreed_coef.sh
+implements:
+
+--- start bash code ---
+
+GENOLIKES='/mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/donor_pops_biallelic_snps_main_autosomes_qc_glf3.glf'
+OUTFILE='/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/donor_pops_biallelic_snps_main_autosomes_qc_F.txt'
+
+CMD="ngsF --glf $GENOLIKES --init_values e --out $OUTFILE --n_ind 30 --n_sites 1391693 --max_iters 3000 --n_threads 20"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
+
+--- end bash code ---
+
+Calculate inbreeding coefficient for historic metapopulation individuals using historic metapopulation allele frequencies
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/historic_metapop_inbreed_coef.sh
+implements:
+
+--- start bash code ---
+
+GENOLIKES='/mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/historic_metapop_biallelic_snps_main_autosomes_qc_glf3.glf'
+OUTFILE='/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/historic_metapop_biallelic_snps_main_autosomes_qc_F.txt'
+
+CMD="ngsF --glf $GENOLIKES --init_values e --out $OUTFILE --n_ind 59 --n_sites 1869994 --max_iters 3000 --n_threads 20"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
+
+--- end bash code ---
+
+Attach individual identity to the output of ngsF and collate results that use population specific allele frequencies. Note that 
+{site1, site12, site18, Texaco} used allele frequencies from the pool of all donor sites and all 'other' M4 individuals used 
+allele frequencies of the historic metapopulation (all jays sampled from 2003-2008). Allele frequencies were estimated after removing 
+first degree relationships (all r <= 0.4 to be exact).
+
+--- start R code ---
+
+# read in metadata
+meta <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
+
+# read in F values
+contemp_cr <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/contemporary_cr_biallelic_snps_main_autosomes_qc_F.txt', head=FALSE)
+res_cr <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/resident_cr_biallelic_snps_main_autosomes_qc_F.txt', head=FALSE)
+s13 <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/site13_biallelic_snps_main_autosomes_qc_F.txt', head=FALSE)
+donor <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/donor_pops_biallelic_snps_main_autosomes_qc_F.txt', head=FALSE)
+histmeta <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/historic_metapop_biallelic_snps_main_autosomes_qc_F.txt', head=FALSE)
+
+# read in lists of bam files used to calculate genotype likelihood input for ngsF
+contemp_bam <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/map/population_specific_bam_lists/contemporary_cr_bams.txt', head=FALSE)
+res_bam <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/map/population_specific_bam_lists/resident_cr_bams.txt', head=FALSE)
+s13_bam <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/map/population_specific_bam_lists/site13_bams.txt', head=FALSE)
+donor_bam <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/map/population_specific_bam_lists/donor_pop_bams.txt', head=FALSE)
+histmeta_bam <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/map/population_specific_bam_lists/historic_metapopulation_bams.txt', head=FALSE)
+
+# Associate IDs with F values
+contemp_cr$ID <- gsub('/mnt/research/Fitz_Lab/projects/mosaic/map/bam/|.bam','',contemp_bam$V1)
+res_cr$ID <- gsub('/mnt/research/Fitz_Lab/projects/mosaic/map/bam/|.bam','',res_bam$V1)
+s13$ID <- gsub('/mnt/research/Fitz_Lab/projects/mosaic/map/bam/|.bam','',s13_bam$V1)
+donor$ID <- gsub('/mnt/research/Fitz_Lab/projects/mosaic/map/bam/|.bam','',donor_bam$V1)
+histmeta$ID <- gsub('/mnt/research/Fitz_Lab/projects/mosaic/map/bam/|.bam','',histmeta_bam$V1)
+
+# collate values
+combF <- data.frame(ID=read.table('/mnt/research/Fitz_Lab/projects/mosaic/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")$LAB_ID)
+combF$F_CONTEMPORARY_CR_AF <- unname(sapply(combF$ID,function(x,df){idx = which(df$ID == x); ifelse(length(idx) > 0, df$V1[idx], NA)}, df=contemp_cr))
+combF$F_RESIDENT_CR_AF <- unname(sapply(combF$ID,function(x,df){idx = which(df$ID == x); ifelse(length(idx) > 0, df$V1[idx], NA)}, df=res_cr))
+combF$F_SITE13_AF <- unname(sapply(combF$ID,function(x,df){idx = which(df$ID == x); ifelse(length(idx) > 0, df$V1[idx], NA)}, df=s13))
+combF$F_DONOR_AF <- unname(sapply(combF$ID,function(x,df){idx = which(df$ID == x); ifelse(length(idx) > 0, df$V1[idx], NA)}, df=donor))
+combF$F_HISTORIC_METAPOP_AF <- unname(sapply(combF$ID,function(x,df){idx = which(df$ID == x); ifelse(length(idx) > 0, df$V1[idx], NA)}, df=histmeta))
+
+# Generate a column of F calculated using population specific allele frequencies
+combF$F_POP_SPECIFIC_AF <- NA
+for (i in 1:nrow(combF)) {
+	id <- combF$ID[i]
+	pop <- meta$pop[which(meta$LAB_ID == id)]
+	if (pop == "Contemporary") {
+		combF$F_POP_SPECIFIC_AF[i] <- combF$F_CONTEMPORARY_CR_AF[i]
+	} else if (pop == "Resident") {
+		combF$F_POP_SPECIFIC_AF[i] <- combF$F_RESIDENT_CR_AF[i]
+	} else if (pop == "SITE_13") {
+		combF$F_POP_SPECIFIC_AF[i] <- combF$F_SITE13_AF[i]
+	} else if (pop == "SITE_1" || pop == "SITE_12" || pop == "SITE_18" || pop == "TEXACO") {
+		combF$F_POP_SPECIFIC_AF[i] <- combF$F_DONOR_AF[i]
+	} else if (pop == "Golden_Aster_Scrub" || pop == "Brigman" || pop == "W.Balm" || pop == "Duette_headwaters" || pop == "Sun_City") {
+		combF$F_POP_SPECIFIC_AF[i] <- combF$F_HISTORIC_METAPOP_AF[i]
+	} else {
+		stop(paste0("Unknown population ",pop))
+	}
+}
+
+# write results
+# write.table(combF, file='/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_pop_specific_ref_AF.txt', col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE)
+
+--- end R code ---
+
+## Statistical tests comparing F between groups
+
+--- start R code ---
+
+# read in F values calculated using population-specific allele frequencies
+f.popaf <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_pop_specific_ref_AF.txt', head=TRUE)
+
+# read in IDs for subsets of individuals
+contemp.all <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs/contemporary_cr_ids.txt',head=FALSE)$V1 # pairwise relatedness between all of these samples is < 0.4, so is an "unrelated" sample for this analysis
+res.all <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs/resident_cr_ids.txt',head=FALSE)$V1
+res.unrelate <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs/resident_cr_relatedness_maxr0.4_ids.txt',head=FALSE)$V1
+donors.all <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs/donor_pops_ids.txt',head=FALSE)$V1
+trans.all <- donors.all[-which(donors.all == "T_072")] # all translocated individuals
+donors.unrelated <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs/donor_pops_relatedness_maxr0.4_ids.txt',head=FALSE)$V1
+trans.unrelated <- donors.unrelated[-which(donors.unrelated == "T_072")] # translocated individuals with no first degree relatives
+
+## F is not normally distributed
+
+shapiro.test(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)])
+#
+#	Shapiro-Wilk normality test
+#
+#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)]
+#W = 0.52384, p-value = 2.028e-08
+
+shapiro.test(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.all == TRUE)])
+#
+#	Shapiro-Wilk normality test
+#
+#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.all == TRUE)]
+#W = 0.46324, p-value = 1.068e-06
+
+shapiro.test(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)])
+#
+#	Shapiro-Wilk normality test
+#
+#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)]
+#W = 0.45359, p-value = 2.618e-06
+
+shapiro.test(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.all == TRUE)])
+#
+#	Shapiro-Wilk normality test
+#
+#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.all == TRUE)]
+#W = 0.51958, p-value = 1.256e-08
+
+shapiro.test(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)])
+#
+#	Shapiro-Wilk normality test
+#
+#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)]
+#W = 0.68529, p-value = 0.0001738
+
+## F summary stats for different groups
+
+# All Contemporary CR individuals (all pairwise r < 0.4, i.e. no first degree relatives)
+mean(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)])
+#[1] 0.01707861 
+sd(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)])
+#[1] 0.02587532
+range(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)])
+#[1] 0.001406 0.137558
+
+# All resident CR individuals
+mean(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.all == TRUE)])
+#[1] 0.01012019
+sd(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.all == TRUE)])
+#[1] 0.02268801
+range(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.all == TRUE)])
+#[1] 0.000277 0.091737
+
+# Unrelated resident CR individuals
+mean(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)])
+#[1] 0.01033443
+#sd(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)])
+[1] 0.02424458
+range(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)])
+#[1] 0.000277 0.091737
+
+# all translocated individuals
+mean(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.all == TRUE)])
+#[1] 0.004767345
+sd(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.all == TRUE)])
+#[1] 0.009077819
+#range(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.all == TRUE)])
+[1] 0.000092 0.042977
+
+# unrelated translocated individuals
+mean(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)])
+#[1] 0.008187267
+sd(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)])
+#[1] 0.01176101
+range(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)])
+#[1] 0.000183 0.042977
+
+## Test for differences in F
+
+# Contemporary vs Resident CR after removing relatedness > 0.4
+wilcox.test(x=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)], y=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)], alternative="two.sided")
+#
+#	Wilcoxon rank sum exact test
+#
+#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)] and f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)]
+#W = 308, p-value = 0.002208
+#alternative hypothesis: true location shift is not equal to 0
+
+# All Contemporary vs all Resident CR
+wilcox.test(x=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)], y=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.all == TRUE)], alternative="two.sided")
+#
+#	Wilcoxon rank sum exact test
+#
+#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)] and f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.all == TRUE)]
+#W = 340, p-value = 0.004002
+#alternative hypothesis: true location shift is not equal to 0
+
+# Contemporary versus unrelated translocated
+wilcox.test(x=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)], y=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)], alternative="two.sided")
+#
+#	Wilcoxon rank sum exact test
+#
+#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)] and f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)]
+#W = 298, p-value = 0.02453
+#alternative hypothesis: true location shift is not equal to 0
+
+# Contemporary versus all translocated
+wilcox.test(x=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)], y=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.all == TRUE)], alternative="two.sided")
+#
+#	Wilcoxon rank sum exact test
+#
+#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)] and f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.all == TRUE)]
+#W = 682, p-value = 3.515e-06
+#alternative hypothesis: true location shift is not equal to 0
+
+# Resident CR versus translocated individuals after removing relatedness > 0.4
+wilcox.test(x=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)], y=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)], alternative="two.sided")
+#
+#	Wilcoxon rank sum exact test
+#
+#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)] and f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)]
+#W = 89, p-value = 0.5045
+#alternative hypothesis: true location shift is not equal to 0
+
+# All Resident CR versus all translocated individuals
+wilcox.test(x=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.all == TRUE)], y=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.all == TRUE)], alternative="two.sided")
+#
+#	Wilcoxon rank sum exact test
+#
+#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.all == TRUE)] and f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.all == TRUE)]
+#W = 282, p-value = 0.2435
+#alternative hypothesis: true location shift is not equal to 0
+
+--- end R code ---
+
+
+## boxplots comparing individuals inbreeding esimated using population-specific allele frequencies
+
+--- start R code ---
+
+library(scales)
+
+meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
+fdf <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_pop_specific_ref_AF.txt', head=TRUE)
+fdf <- fdf[match(meta$LAB_ID, fdf$ID),] # ensure that the order of individuals matches the metadata
+
+meta$popletter <- popletters(meta) # popletters function defined in /home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/README_MOSAIC_ANALYSIS
+meta$popcol <- popcolor(meta) # popcolor function defined in /home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/README_MOSAIC_ANALYSIS
+meta$colors <- sitecol(meta) # sitecol function defined in /home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/README_MOSAIC_ANALYSIS
+
+# define groups
+groups <- meta$pop
+grplevels <- c("Contemporary", "Resident", "Translocated", "M4")
+
+groups <- replace(groups, which(groups == "Golden_Aster_Scrub" | groups == "Brigman" | groups == "W.Balm" | 
+groups == "Duette_headwaters" | groups == "Sun_City"), "M4")
+
+groups <- replace(groups, which(groups == "SITE_1" | groups == "SITE_12" | groups == "SITE_13" | 
+groups == "SITE_18" | groups == "TEXACO"), "Translocated")
+
+fdf$group = factor(groups,levels=grplevels)
+
+# omit T_072 (RSW-K) because this site 1 bird was not translocated and migrated to LMSP, which is outside of the Core
+fdf <- fdf[-which(fdf$ID == "T_072"),]
+meta <- meta[-which(meta$LAB_ID == "T_072"),]
+
+# set point type
+fdf$biopoint = biopoint(meta$pop) # biopoint function defined in /home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/README_MOSAIC_ANALYSIS
+
+max(fdf$F_POP_SPECIFIC_AF)
+# [1] 0.137558 # set upper y-limit above this value
+
+# plot
+# h_boxplot2 function defined in /home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/README_MOSAIC_ANALYSIS
+
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/F_distribution_pop_specific_AF.png',width=7, height=7,units='in', res=300)
+h_boxplot2(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=fdf$biopoint, seed=1947, color=meta$popcol, ylim=c(0,0.145))
+axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
+#dev.off()
+
+
+# make plot with IDs at points
+#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/figures/F_distribution_pop_specific_AF_text.pdf',width=7, height=7)
+h_boxplot2(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.145), idlabels=fdf$ID)
+axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
+
+# zoomed in plot to better distinguish IDs
+h_boxplot2(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.05), idlabels=fdf$ID)
+axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
+
+# zoomed in more
+h_boxplot2(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.008), idlabels=fdf$ID)
+axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
+
+# zoom even more
+h_boxplot2(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.003), idlabels=fdf$ID)
+axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
+
+#dev.off()
+
+## make a plot to find where the top 5 pedigree-based contributors circled in figure 3A are in the boxplot
+
+h_boxplot_mask <- function(x=NULL, n=NULL, lev=grplevels, ylabel="Heterozygosity", pntlab=NULL, seed=10287, color=NULL, ylimits=NULL, idlabels=NULL) {
+        if (length(grep("TeachingDemos",(.packages()))) == 0) library(TeachingDemos) # for shadowtext()
+        nlevel = length(lev)
+
+        par(mar=c(5,5,2,2))
+        boxplot(x[,n] ~ group, data=x, outline=FALSE, names=c(rep("",nlevel)), xlab="", ylab=ylabel, main="", col="gray80", cex.axis=1.5, cex.lab=1.5, lwd=2, ylim=ylimits)
+        #mtext(lev,1,at=1:nlevel, padj=1, cex=1.5)
+        mtext(c(lev[1:3],paste("Other","M4",sep="\n")), 1,at=1:nlevel, padj=1, cex=1.5)
+        #mtext("Group",1,at=3,padj=2.5, cex=1.5)
+
+        # add points
+        for (i in lev) {
+                idx = which(as.character(x$group) == i)
+                set.seed(seed)
+                xjitter = jitter(rep(which(lev == i),length(idx)), amount=0.2)
+                ptcol = NULL
+                for (j in 1:length(idx)) {
+                        if (is.null(color)) ptcol = alpha("maroon",0.5) else ptcol = color[idx[j]]
+                        if (is.null(pntlab) || is.na(pntlab[idx[j]])) {
+                                if (!is.null(idlabels)) {
+                                  text(y=x[idx[j],n], x=xjitter[j],idlabels[idx[j]],cex=0.5,col="red")
+                                } else {
+                                  points(y=x[idx[j],n], x=xjitter[j], pch=1, cex=1.2)
+                                  points(y=x[idx[j],n], x=xjitter[j], pch=16, cex=1.2, col=ptcol)
+                                }
+                        } else if (class(pntlab) == "numeric") {
+                                points(y=x[idx[j],n], x=xjitter[j], pch=pntlab[idx[j]], col=alpha("grey70",0.5), bg=color[idx[j]],lwd=1.3,cex=1.5)
+                        }  else if (class(pntlab) == "character") {
+                                shadowtext(y=x[idx[j],n], x=xjitter[j], labels=pntlab[idx[j]], col=color[idx[j]], bg=alpha("black",0.5), r=0.07, cex=1.2)       
+                        } else stop("Unknown argument to pntlab")
+                }
+        }
+
+}
+
+meta$maskcol = meta$popcol
+meta$maskcol[-which(meta$LAB_ID == "T_071" | meta$LAB_ID == "T_099" | meta$LAB_ID == "T_081" | meta$LAB_ID == "T_086" | meta$LAB_ID == "T_067")] <- alpha("grey90",0)
+meta$maskcol[which(meta$LAB_ID == "T_071")] <- alpha(meta$popcol[which(meta$LAB_ID == "T_071")],0.65)
+meta$maskcol[which(meta$LAB_ID == "T_099")] <- alpha(meta$popcol[which(meta$LAB_ID == "T_099")],0.65)
+meta$maskcol[which(meta$LAB_ID == "T_081")] <- alpha(meta$popcol[which(meta$LAB_ID == "T_081")],0.65)
+meta$maskcol[which(meta$LAB_ID == "T_086")] <- alpha(meta$popcol[which(meta$LAB_ID == "T_086")],0.65)
+meta$maskcol[which(meta$LAB_ID == "T_067")] <- alpha(meta$popcol[which(meta$LAB_ID == "T_067")],0.65)
+
+h_boxplot_mask(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=fdf$biopoint, seed=1947, color=meta$maskcol, ylim=c(0,0.145))
+
+--- end R code ---
 
 ## ---------- PRINCIPAL COMPONENT ANALYSIS ---------- ##
 
 # Estimate genetic covariance between individuals
 
-
+TL TODO
 
 # Calculate eigen vectors and values and visualize PCA
 
@@ -1362,389 +2359,6 @@ pdf('/home/tyler/Dropbox/research/jay/mosaic/popgen/tree/plot/pairwise_dist_ward
 heatmap.2(dist.raw, symm = TRUE, breaks = 40, trace="none", dendrogram="column", Rowv=TRUE, colCol=meta$popcol, colRow=meta$popcol, col=viridis, margins=c(7,7), cexRow=0.55, cexCol=0.55, offsetRow=-0.5, offsetCol=-0.5, key.title=NA, keysize=1, hclustfun = function(x) hclust(x,method="ward.D"), distfun=function(x)dist(x,method="euclidean"))
 
 dev.off()
-
-## Thetas
-
-# Watterson's theta, pi, Tajima's D
-
-R
-
-grps = c("E", "C", "T", "M4", "I")
-fprefix="/home/tyler/Dropbox/research/jay/mosaic/popgen/theta/fsj_mosaic_allsites_main_autosomes_qc"
-
-df = NULL
-for (g in grps) {
-	theta <- read.table(paste0(fprefix,"_",g,".thetas.idx.pestPG"))
-	nsites = sum(theta[,14])
-	theta$wt = theta[,14]/nsites
-	df=rbind(df, data.frame(Group=g, Theta_Watterson = sum(theta[,4])/nsites, Pi = sum(theta[,5])/nsites, TajimaD = sum(theta[,9]*theta$wt)))
-}
-
-#write.table(df,file='/home/tyler/Dropbox/research/jay/mosaic/popgen/theta/fsj_mosaic_allsites_main_autosomes_qc_group_genome.thetas',col.names=TRUE,row.names=FALSE,quote=FALSE,sep="\t")
-
-# Heterozygosity
-
-icer_workdir='/mnt/research/Fitz_Lab/projects/mosaic/popgen/theta/heterozygosity'
-
-# heterozygosity at QC SNPs
-$ for i in {1..87}; do SAMP=$(sed -n "${i}p" /mnt/research/Fitz_Lab/projects/mosaic/mosiac_ids.txt); sfs=$((printf "%s " "$SAMP" && head -n1 fsj_mosaic_biallelic_snps_main_autosomes_qc_${SAMP}.fold.sfs) | tr ' ' \\t | cut -f1-3); echo "$sfs" >> fsj_mosaic_biallelic_snps_main_autosomes_qc_all.fold.sfs; done
-
-# heterozygosity across the entire QC genome
-$ for i in {1..87}; do SAMP=$(sed -n "${i}p" /mnt/research/Fitz_Lab/projects/mosaic/mosiac_ids.txt); sfs=$((printf "%s " "$SAMP" && head -n1 fsj_mosaic_allsites_main_autosomes_qc_${SAMP}.fold.sfs) | tr ' ' \\t | cut -f1-3); echo "$sfs" >> fsj_mosaic_allsites_main_autosomes_qc_all.fold.sfs; done
-
-# Calculate heterozygosity from individual SFS
-
-R
-library(scales) # for alpha
-
-# read in metapop data
-meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
-meta$popletter <- popletters(meta)
-meta$popcol <- popcolor(meta)
-
-#meta$popletter <- pointletters(meta)
-#groups <- meta$type
-#grplevels <- c("C", "E", "T", "M4", "I")
-#groups <- replace(meta$type, which(meta$type == "I"), "U")
-#grplevels <- c("C", "E", "T", "M4", "U")
-#meta$colors <- sitecol(meta)
-
-groups <- meta$pop
-grplevels <- c("Contemporary", "Resident", "Translocated", "M4")
-
-groups <- replace(groups, which(groups == "Golden_Aster_Scrub" | groups == "Brigman" | groups == "W.Balm" | 
-groups == "Duette_headwaters" | groups == "Sun_City"), "M4")
-
-groups <- replace(groups, which(groups == "SITE_1" | groups == "SITE_12" | groups == "SITE_13" | 
-groups == "SITE_18" | groups == "TEXACO"), "Translocated")
-
-allsites <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/theta/fsj_mosaic_allsites_main_autosomes_qc_all.fold.sfs',head=FALSE) # H all sites
-snps <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/theta/fsj_mosaic_biallelic_snps_main_autosomes_qc_all.fold.sfs',head=FALSE) # H SNPs
-
-# calculate H
-allsites$H <- sapply(1:nrow(allsites), function(x,df){df[x,3]/sum(df[x,2:3])},df=allsites)
-allsites$group = factor(groups,levels=grplevels)
-
-snps$H <- sapply(1:nrow(snps), function(x,df){df[x,3]/sum(df[x,2:3])},df=snps)
-snps$group = factor(groups,levels=grplevels)
-
-# omit T_072 (RSW-K) because this site 1 bird was not translocated and migrated to LMSP, which is outside of the Core
-allsites <- allsites[-which(allsites$V1 == "T_072"),]
-snps <- snps[-which(snps$V1 == "T_072"),]
-meta <- meta[-which(meta$LAB_ID == "T_072"),]
-
-# plot
-
-h_boxplot <- function(x=NULL, n=NULL, lev=grplevels, ylabel="Heterozygosity", pntlab=NULL, seed=10287, color=NULL, ylimits=NULL) {
-	# make boxplots
-	par(mar=c(5,5,2,2))
-	boxplot(x[,n] ~ group, data=x, outline=FALSE, names=c(rep("",5)), xlab="", ylab=ylabel, main="", col="gray80", cex.axis=1.5, cex.lab=1.5, lwd=2, ylim=ylimits)
-	mtext(lev,1,at=1:5, padj=1, cex=1.5)
-	mtext("Group",1,at=3,padj=2.5, cex=1.5)
-
-	# add points
-	for (i in lev) {
-		idx = which(as.character(x$group) == i)
-		set.seed(seed)
-		xjitter = jitter(rep(which(lev == i),length(idx)), amount=0.2)
-		ptcol = NULL
-		if (is.null(color)) ptcol = alpha("maroon",0.5) else ptcol = alpha(color[idx],0.5)
-		if (is.null(pntlab)) {
-			points(y=x[idx,n], x=xjitter, pch=1, cex=1.2)
-			points(y=x[idx,n], x=xjitter, pch=16, cex=1.2, col=ptcol)
-		} else {
-			text(y=x[idx,n], x=xjitter, labels=pntlab[idx], cex=1.1, col=ptcol)		
-		}
-	}
-}
-
-h_boxplot2 <- function(x=NULL, n=NULL, lev=grplevels, ylabel="Heterozygosity", pntlab=NULL, seed=10287, color=NULL, ylimits=NULL, idlabels=NULL) {
-	if (length(grep("TeachingDemos",(.packages()))) == 0) library(TeachingDemos) # for shadowtext()
-	nlevel = length(lev)
-
-	par(mar=c(5,5,2,2))
-	boxplot(x[,n] ~ group, data=x, outline=FALSE, names=c(rep("",nlevel)), xlab="", ylab=ylabel, main="", col="gray80", cex.axis=1.5, cex.lab=1.5, lwd=2, ylim=ylimits)
-	#mtext(lev,1,at=1:nlevel, padj=1, cex=1.5)
-	mtext(c(lev[1:3],paste("Other","M4",sep="\n")), 1,at=1:nlevel, padj=1, cex=1.5)
-	#mtext("Group",1,at=3,padj=2.5, cex=1.5)
-
-	# add points
-	for (i in lev) {
-		idx = which(as.character(x$group) == i)
-		set.seed(seed)
-		xjitter = jitter(rep(which(lev == i),length(idx)), amount=0.2)
-		ptcol = NULL
-		for (j in 1:length(idx)) {
-			if (is.null(color)) ptcol = alpha("maroon",0.5) else ptcol = alpha(color[idx[j]],0.5)
-			if (is.null(pntlab) || is.na(pntlab[idx[j]])) {
-				if (!is.null(idlabels)) {
-				  text(y=x[idx[j],n], x=xjitter[j],idlabels[idx[j]],cex=0.5,col="red")
-				} else {
-				  points(y=x[idx[j],n], x=xjitter[j], pch=1, cex=1.2)
-				  points(y=x[idx[j],n], x=xjitter[j], pch=16, cex=1.2, col=ptcol)
-				}
-			} else if (class(pntlab) == "numeric") {
-				points(y=x[idx[j],n], x=xjitter[j], pch=pntlab[idx[j]], col="black", bg=alpha(color[idx[j]],0.65),lwd=1.3,cex=1.5)
-			}  else if (class(pntlab) == "character") {
-				shadowtext(y=x[idx[j],n], x=xjitter[j], labels=pntlab[idx[j]], col=color[idx[j]], bg=alpha("black",0.5), r=0.07, cex=1.2)	
-			} else stop("Unknown argument to pntlab")
-		}
-	}
-
-}
-
-
-# set point type
-pointcode <- meta$popletter
-pointcode <- replace(pointcode, which(pointcode == "C" | pointcode == "R"),NA)
-allsites$biopoint = biopoint(meta$pop)
-snps$biopoint = biopoint(meta$pop)
-
-
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/theta/plots/fsj_mosaic_allsites_main_autosomes_qc_heterozygosity_popcol.pdf') # deprecated
-#h_boxplot2(x=allsites, n=4, lev=grplevels, ylabel="Heterozygosity per site", pntlab=pointcode, seed=10287, color=meta$popcol, ylimits=NULL)
-#dev.off()
-
-png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/H_distribution.png',width=7, height=7,units='in', res=300)
-h_boxplot2(x=allsites, n=4, lev=grplevels, ylabel="Heterozygosity per site", pntlab=allsites$biopoint, seed=10287, color=meta$popcol, ylimits=NULL)
-dev.off()
-
-png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/H_distribution_text.png',width=7, height=7,units='in', res=300)
-h_boxplot2(x=allsites, n=4, lev=grplevels, ylabel="Heterozygosity per site", pntlab=NULL, seed=10287, color=meta$popcol, ylimits=NULL, idlabels=allsites$V1)
-dev.off()
-
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/theta/plots/fsj_mosaic_allsites_main_autosomes_qc_heterozygosity.pdf')
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/theta/plots/fsj_mosaic_allsites_main_autosomes_qc_heterozygosity_colors2.pdf')
-#h_boxplot(x=allsites, n=4, lev=grplevels, ylabel="Heterozygosity per site",pntlab=meta$popletter)
-#h_boxplot(x=allsites, n=4, lev=grplevels, ylabel="Heterozygosity per site",pntlab=meta$popletter,color=meta$colors)
-#h_boxplot(x=allsites, n=4, lev=grplevels, ylabel="Heterozygosity per site",color=meta$colors)
-#dev.off()
-
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/theta/plots/fsj_mosaic_allsites_main_autosomes_qc_heterozygosity_indlab.pdf')
-#h_boxplot(x=allsites, n=4, lev=grplevels, ylabel="Heterozygosity per site",pntlab=meta$LAB_ID,color=meta$colors)
-#dev.off()
-
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/theta/plots/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_heterozygosity.pdf')
-#h_boxplot(x=snps, n=4, lev=grplevels, ylabel="Heterozygosity per site",pntlab=meta$popletter)
-#dev.off()
-
-# write H results
-allsites$pop <- meta$pop
-colnames(allsites) <- c("SAMPLE", "N_HOMO_SITES", "N_HET_SITES", "H", "CLASS", "POPULATION")
-write.table(allsites,file='/home/tyler/Dropbox/research/jay/mosaic/popgen/theta/fsj_mosaic_allsites_main_autosomes_qc_all.fold.sfs.het2',col.names=TRUE,row.names=FALSE,quote=FALSE,sep="\t")
-
-colnames(allsites) <- c("SAMPLE", "N_HOMO_SITES", "N_HET_SITES", "H", "CLASS")
-#write.table(allsites[,1:4],file='/home/tyler/Dropbox/research/jay/mosaic/popgen/theta/fsj_mosaic_allsites_main_autosomes_qc_all.fold.sfs.het',col.names=TRUE,row.names=FALSE,quote=FALSE,sep="\t")
-
-colnames(snps) <- c("SAMPLE", "N_HOMO_SITES", "N_HET_SITES", "H", "CLASS")
-#write.table(snps[,1:4],file='/home/tyler/Dropbox/research/jay/mosaic/popgen/theta/fsj_mosaic_biallelic_snps_main_autosomes_qc_all.fold.sfs.het',col.names=TRUE,row.names=FALSE,quote=FALSE,sep="\t")
-
-# test for difference in H between exisiting and contemporary Wellfield
-
-#wilcox.test(x=allsites$H[which(allsites$group == "E")], y=allsites$H[which(allsites$group == "C")], alternative="two.sided")
-#
-#	Wilcoxon rank sum exact test
-#
-#data:  allsites$H[which(allsites$group == "E")] and allsites$H[which(allsites$group == "C")]
-#W = 218, p-value = 0.04638
-#alternative hypothesis: true location shift is not equal to 0
-
-# update with reassigned unbanded invdividuals
-
-wilcox.test(x=allsites$H[which(allsites$group == "Resident")], y=allsites$H[which(allsites$group == "Contemporary")], alternative="two.sided")
-
-#	Wilcoxon rank sum exact test
-#
-#data:  allsites$H[which(allsites$group == "Resident")] and allsites$H[which(allsites$group == "Contemporary")]
-#W = 350, p-value = 0.001642
-#alternative hypothesis: true location shift is not equal to 0
-
-wilcox.test(x=allsites$H[which(allsites$group == "Resident")], y=allsites$H[which(allsites$group == "Translocated")], alternative="two.sided")
-
-#	Wilcoxon rank sum exact test
-#
-#data:  allsites$H[which(allsites$group == "Resident")] and allsites$H[which(allsites$group == "Translocated")]
-#W = 280, p-value = 0.2632
-#alternative hypothesis: true location shift is not equal to 0
-
-wilcox.test(x=allsites$H[which(allsites$group == "Contemporary")], y=allsites$H[which(allsites$group == "Translocated")], alternative="two.sided")
-
-#	Wilcoxon rank sum exact test
-#
-#data:  allsites$H[which(allsites$group == "Contemporary")] and allsites$H[which(allsites$group == "Translocated")]
-#W = 311, p-value = 0.1322
-#alternative hypothesis: true location shift is not equal to 0
-
-wilcox.test(x=allsites$H[which(allsites$group == "M4")], y=allsites$H[which(allsites$group == "Translocated")], alternative="two.sided")
-
-#	Wilcoxon rank sum exact test
-#
-#data:  allsites$H[which(allsites$group == "M4")] and allsites$H[which(allsites$group == "Translocated")]
-#W = 269, p-value = 0.02818
-#alternative hypothesis: true location shift is not equal to 0
-
-# Resident H stats
-> mean(allsites$H[which(allsites$group == "Resident")])
-# [1] 0.000225286 # mean
-> sd(allsites$H[which(allsites$group == "Resident")])
-#[1] 2.438032e-05 # standard deviation
-
-
-# Contemporary H stats
-> mean(allsites$H[which(allsites$group == "Contemporary")])
-# [1] 0.0002010206 # mean
-> sd(allsites$H[which(allsites$group == "Contemporary")])
-# [1] 1.846997e-05 # standard deviation
-
-# Translocated H stats
-> mean(allsites$H[which(allsites$group == "Translocated")])
-# [1] 0.0002157266 # mean
-> sd(allsites$H[which(allsites$group == "Translocated")])
-# [1] 3.313022e-05 # standard deviation
-
-## F-statistics
-
-# FST
-
-icer_workdir='/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats'
-
-$ realSFS fst stats fsj_mosaic_biallelic_snps_main_autosomes_qc_E_vs_C.fst.idx > fsj_mosaic_biallelic_snps_main_autosomes_qc_E_vs_C.fst.global 2>&1
-$ realSFS fst stats fsj_mosaic_biallelic_snps_main_autosomes_qc_E_vs_T.fst.idx > fsj_mosaic_biallelic_snps_main_autosomes_qc_E_vs_T.fst.global 2>&1
-$ realSFS fst stats fsj_mosaic_biallelic_snps_main_autosomes_qc_E_vs_M4.fst.idx > fsj_mosaic_biallelic_snps_main_autosomes_qc_E_vs_M4.fst.global 2>&1
-$ realSFS fst stats fsj_mosaic_biallelic_snps_main_autosomes_qc_E_vs_I.fst.idx > fsj_mosaic_biallelic_snps_main_autosomes_qc_E_vs_I.fst.global 2>&1
-$ realSFS fst stats fsj_mosaic_biallelic_snps_main_autosomes_qc_C_vs_T.fst.idx > fsj_mosaic_biallelic_snps_main_autosomes_qc_C_vs_T.fst.global 2>&1
-$ realSFS fst stats fsj_mosaic_biallelic_snps_main_autosomes_qc_C_vs_M4.fst.idx > fsj_mosaic_biallelic_snps_main_autosomes_qc_C_vs_M4.fst.global 2>&1
-$ realSFS fst stats fsj_mosaic_biallelic_snps_main_autosomes_qc_C_vs_I.fst.idx > fsj_mosaic_biallelic_snps_main_autosomes_qc_C_vs_I.fst.global 2>&1
-$ realSFS fst stats fsj_mosaic_biallelic_snps_main_autosomes_qc_T_vs_M4.fst.idx > fsj_mosaic_biallelic_snps_main_autosomes_qc_T_vs_M4.fst.global 2>&1
-$ realSFS fst stats fsj_mosaic_biallelic_snps_main_autosomes_qc_T_vs_I.fst.idx > fsj_mosaic_biallelic_snps_main_autosomes_qc_T_vs_I.fst.global 2>&1
-$ realSFS fst stats fsj_mosaic_biallelic_snps_main_autosomes_qc_M4_vs_I.fst.idx > fsj_mosaic_biallelic_snps_main_autosomes_qc_M4_vs_I.fst.global 2>&1
-
-# F (inbreeding coefficient)
-
-R
-
-library(scales) # for alpha
-
-# read in metapop data
-meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
-meta$popletter <- popletters(meta)
-meta$popcol <- popcolor(meta)
-
-# assign colors
-#meta$popletter <- pointletters(meta)
-#groups <- meta$type
-#grplevels <- c("C", "E", "T", "M4", "I")
-#groups <- replace(meta$type, which(meta$type == "I"), "U")
-#grplevels <- c("C", "E", "T", "M4", "U")
-meta$colors <- sitecol(meta)
-
-# define groups
-groups <- meta$pop
-grplevels <- c("Contemporary", "Resident", "Translocated", "M4")
-
-groups <- replace(groups, which(groups == "Golden_Aster_Scrub" | groups == "Brigman" | groups == "W.Balm" | 
-groups == "Duette_headwaters" | groups == "Sun_City"), "M4")
-
-groups <- replace(groups, which(groups == "SITE_1" | groups == "SITE_12" | groups == "SITE_13" | 
-groups == "SITE_18" | groups == "TEXACO"), "Translocated")
-
-# read in F (inbreeding coefficient)
-fcoef <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F.txt',head=FALSE) # F
-fcoef$group = factor(groups,levels=grplevels)
-fcoef$SAMPLE = meta$LAB_ID
-
-# omit T_072 (RSW-K) because this site 1 bird was not translocated and migrated to LMSP, which is outside of the Core
-fcoef <- fcoef[-which(fcoef$SAMPLE == "T_072"),]
-meta <- meta[-which(meta$LAB_ID == "T_072"),]
-
-# set point type
-fcoef$biopoint = biopoint(meta$pop)
-
-png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/F_distribution.png',width=7, height=7,units='in', res=300)
-h_boxplot2(x=fcoef, n=1, lev=grplevels, ylabel="Inbreeding coefficient (F)", pntlab=fcoef$biopoint, seed=1947, color=meta$popcol, ylimits=c(0,0.17))
-dev.off()
-
-png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/F_distribution_text.png',width=7, height=7,units='in', res=300)
-h_boxplot2(x=fcoef, n=1, lev=grplevels, ylabel="Inbreeding coefficient (F)", pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.17), idlabels=fcoef$SAMPLE)
-dev.off()
-
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/plots/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_popcol.pdf') # deprecated
-#h_boxplot2(x=fcoef, n=1, lev=grplevels, ylabel="Inbreeding coefficient (F)", pntlab=pointcode, seed=1947, color=meta$popcol, ylimits=c(0,0.17))
-#dev.off()
-
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/plots/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F.pdf')
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/plots/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_colors2.pdf')
-#h_boxplot(x=fcoef, n=1, lev=grplevels, ylabel="F",pntlab=meta$popletter)
-h_boxplot(x=fcoef, n=1, lev=grplevels, ylabel="F",color=meta$colors)
-#dev.off()
-
-# plot with a little more room
-pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/plots/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_colors2_xtraspace.pdf')
-h_boxplot(x=fcoef, n=1, lev=grplevels, ylabel="F",color=meta$colors, ylimits=c(0,0.09))
-dev.off()
-
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/plots/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_indlab.pdf')
-h_boxplot(x=fcoef, n=1, lev=grplevels, ylabel="F",pntlab=meta$LAB_ID,color=meta$colors)
-#dev.off()
-
-# Write F results
-fcoef$POPULATION = meta$pop
-fcoef <- fcoef[,c(3,1,2,4)]
-colnames(fcoef) <- c("SAMPLE", "F", "CLASS", "POPULATION")
-
-write.table(fcoef, file='/home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_formatted.txt',col.names=TRUE,row.names=FALSE,sep="\t",quote=FALSE)
-
-# Resident F stats
-#> mean(fcoef$V1[fcoef$group == "Resident"])
-#[1] 0.02127406 # mean
-> sd(fcoef$V1[fcoef$group == "Resident"])
-# [1] 0.02996335 # standard deviation
-
-# Contemporary F stats
-> mean(fcoef$V1[fcoef$group == "Contemporary"])
-#[1] 0.03405179 # mean
-> sd(fcoef$V1[fcoef$group == "Contemporary"])
-# [1] 0.03100887 # standard deviation
-
-# Translocated F stats
-> mean(fcoef$V1[fcoef$group == "Translocated"])
-#[1] 0.01956483 # mean
-> sd(fcoef$V1[fcoef$group == "Translocated"])
-#[1] 0.02103134 # standard deviation
-
-# test for significant difference in F between Residents and contemporary Wellfield
-
-wilcox.test(x=fcoef$V1[which(fcoef$group == "Resident")], y=fcoef$V1[which(fcoef$group == "Contemporary")], alternative="two.sided")
-
-#	Wilcoxon rank sum exact test
-#
-#data:  fcoef$V1[which(fcoef$group == "Resident")] and fcoef$V1[which(fcoef$group == "Contemporary")]
-#W = 114, p-value = 0.006556
-#alternative hypothesis: true location shift is not equal to 0
-
-wilcox.test(x=fcoef$V1[which(fcoef$group == "Resident")], y=fcoef$V1[which(fcoef$group == "Translocated")], alternative="two.sided")
-
-#	Wilcoxon rank sum exact test
-#
-#data:  fcoef$V1[which(fcoef$group == "Resident")] and fcoef$V1[which(fcoef$group == "Translocated")]
-#W = 199, p-value = 0.4451
-#alternative hypothesis: true location shift is not equal to 0
-
-wilcox.test(x=fcoef$V1[which(fcoef$group == "Contemporary")], y=fcoef$V1[which(fcoef$group == "Translocated")], alternative="two.sided")
-
-#	Wilcoxon rank sum exact test
-#
-#data:  fcoef$V1[which(fcoef$group == "Contemporary")] and fcoef$V1[which(fcoef$group == "Translocated")]
-#W = 574, p-value = 0.006822
-#alternative hypothesis: true location shift is not equal to 0
-
-wilcox.test(x=fcoef$V1[which(fcoef$group == "M4")], y=fcoef$V1[which(fcoef$group == "Translocated")], alternative="two.sided")
-
-#	Wilcoxon rank sum exact test
-#
-#data:  fcoef$V1[which(fcoef$group == "M4")] and fcoef$V1[which(fcoef$group == "Translocated")]
-#W = 174, p-value = 0.7069
-#alternative hypothesis: true location shift is not equal to 0
 
 
 ## Relatedness
