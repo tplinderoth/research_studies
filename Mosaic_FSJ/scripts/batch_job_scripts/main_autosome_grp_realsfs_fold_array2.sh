@@ -23,7 +23,7 @@
 #SBATCH --mem=72000mb
 #! Submit a job array with index values between 0 and 31
 #! NOTE: This must be a range, not a single number
-#SBATCH --array=0-1
+#SBATCH --array=0-3
 
 #! This is the partition name.
 #! #SBATCH -p cclake
@@ -56,7 +56,7 @@ echo "This is job" $SLURM_ARRAY_TASK_ID
 workdir="$SLURM_SUBMIT_DIR" # The value of SLURM_SUBMIT_DIR sets workdir to the directory
 cd $workdir
 
-GRP_ARR=('resident' 'C')
+GRP_ARR=('resident' 'C' 'T' 'M4')
 FSJGRP="${GRP_ARR[$SLURM_ARRAY_TASK_ID]}"
 SAFIDX="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_allsites_main_autosomes_qc_${FSJGRP}.saf.idx"
 OUTSFS="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_allsites_main_autosomes_qc_${FSJGRP}.fold.sfs"
