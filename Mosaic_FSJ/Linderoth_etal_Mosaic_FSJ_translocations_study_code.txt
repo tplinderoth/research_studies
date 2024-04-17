@@ -870,6 +870,8 @@ eval $CMD
 
 --- end bash code ---
 
+Format ngsRelate output into a two dimensional r matrix - TL TODO
+
 ## Subset individuals such that all pairwise relatedness within each group is <= 0.4, which should exclude any first degree relatives.
 ## These subsets are maximally large, while ensuring that r <= 0.4.
 ## These are the subsets used for estimating average heterozygosity and estimating allele frequencies for inbreeding inferences.
@@ -2612,59 +2614,97 @@ h_boxplot2(x=frohdf, n=2, lev=grplevels, ylabel=expression(Individual~inbreeding
 
 ## ---------- PRINCIPAL COMPONENT ANALYSIS ---------- ##
 
-# Estimate genetic covariance between individuals
+# Estimate genetic covariance among all individuals
 
-TL TODO
+Calculate genotype posterior probabilities using a HWE prior.
 
-# Calculate eigen vectors and values and visualize PCA
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/genotype_post_prob.sh
+implements:
+
+--- start bash code ---
+
+BAMLIST='/mnt/research/Fitz_Lab/projects/mosaic/map/mosaic_bam_list.txt'
+REGFILE='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ_V3_main_autosomes.txt'
+SITESFILE='/mnt/research/Fitz_Lab/projects/mosaic/variants/vcf/biallelic_snps/fsj_mosaic_biallelic_snps_main_autosomes_qc.pos'
+OUTPREFIX='/mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/fsj_mosaic_biallelic_snps_main_autosomes_qc_all'
+
+angsd -bam $BAMLIST -out $OUTPREFIX -GL 1 -doGeno 32 -doPost 1 -doMajorMinor 1 -doMaf 1 -minQ 20 -minMapQ 20 -rf $REGFILE -sites $SITESFILE -P 16
+
+--- end bash code ---
+
+Estimate genetic covariance based on genotype posterior probabilities and using a 2% MAF cutoff.
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/pca/covar_mat_unweighted.sh
+implements:
+
+--- start bash code ---
+
+GENOFILE='/mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/fsj_mosaic_biallelic_snps_main_autosomes_qc_all.geno'
+OUTPUT='/mnt/research/Fitz_Lab/projects/mosaic/popgen/pca/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_unweighted.covar'
+
+CMD="ngsCovar -probfile $GENOFILE -outfile $OUTPUT -nind 87 -nsites 2049176 -norm 0 -call 0 -minmaf 0.02"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
+
+--- end bash code ---
+
+Calculate eigen vectors and values and visualize PCA
+
+--- start R code ---
+
+# read in covariance matrix and perform eigen decomposition on it
 
 covar <- as.matrix(read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/pca/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_unweighted.covar',head=FALSE))
-eig <- eigen(covar)
-var <- round((eig$values/sum(eig$values))*100, digits=2)
+eig <- eigen(covar) # PCs
+var <- round((eig$values/sum(eig$values))*100, digits=2) # variance explained by PCs
 
-meta <- read.table('./data/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
+# set plotting values
+
+meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
 meta$letter_code <- pointletters(meta)
 meta$grpcol <- pntcol(meta)
 meta$popcode <- popletters(meta)
 meta$popcol <- popcolor(meta)
 
-# set color IDs
-jayid <- read.csv('/home/tyler/Dropbox/research/jay/mosaic/metadata/jayid_map_20230512.txt',head=TRUE,sep="\t")
-meta$COLOR_ID = unname(sapply(meta$LAB_ID,function(x,df){id=df$COLOR_ID[which(df$LAB_ID == x)]; ifelse(id=="*",x,id)},df=jayid)) # uses M4 LAB IDs since the M4 birds don't have color IDs
+# Add color band IDs to metadata data.frame
+jayid <- read.csv('/home/tyler/Dropbox/research/jay/mosaic/metadata/jayid_map_20230512.txt',head=TRUE,sep="\t") # this is just a data.frame to map between USFWS, color band, and Fitz Lab IDs
+meta$COLOR_ID = unname(sapply(meta$LAB_ID,function(x,df){id=df$COLOR_ID[which(df$LAB_ID == x)]; ifelse(id=="*",x,id)},df=jayid)) # uses M4 Fitz Lab IDs since the M4 birds don't have color IDs
 
-# plot locality (i.e. type) PCA
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/pca/plots/mosaic_fsj_locality.pdf',width=8,height=8)
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/pca/plots/mosaic_fsj_locality_colors2.pdf',width=8,height=8)
-pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/pca/plots/mosaic_fsj_locality_colors2_print.pdf',width=8,height=8)
+# visualize PCAs
+
+# The following PCAs were just used as exploratory analyses (not for final figures/results)
+
+# plot PCA using type (i.e. E, C, T, I, M4) text as points and colored by type
+#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/pca/plots/mosaic_fsj_locality_colors2_print.pdf',width=8,height=8)
 i = 1
 while (i < 7) {
 	j = i+1
 	par(mar=c(5.1,4.1,4,2)+0.1)
 	plot(x=eig$vectors[,i], y=eig$vectors[,j], xlab=paste0("PC",i,", ",var[i],"%"), ylab=paste0("PC",j,", ",var[j],"%"), type="n", cex.axis=1.4, cex.lab=1.4)
 	text(x=eig$vectors[,i],y=eig$vectors[,j], labels = meta$letter_code, col=meta$grpcol, cex=1.2)
-	#if (i == 1) legend('topleft',fill=c(meta$grpcol[which(meta$type == "E")[1]], meta$grpcol[which(meta$type == "C")[1]], meta$grpcol[which(meta$type == "T")[1]], meta$grpcol[which(meta$type == "M4")[1]], meta$grpcol[which(meta$type == "I")[1]]), c("E","C","T","M4","I"),bty="n", horiz=TRUE, cex=0.8)
 	if (i == 1) legend('topleft',fill=c(meta$grpcol[which(meta$type == "E")[1]], meta$grpcol[which(meta$type == "C")[1]], meta$grpcol[which(meta$type == "T")[1]], meta$grpcol[which(meta$type == "M4")[1]], meta$grpcol[which(meta$type == "I")[1]]), c("E","C","T","M4","U"),bty="n", horiz=TRUE, cex=1.3)
 	i = i+2
 }
-dev.off()
+#dev.off()
 
-# plot individual PCA
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/pca/plots/mosaic_fsj_individual.pdf',width=8,height=8)
-pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/pca/plots/mosaic_fsj_individual_popcol.pdf',width=8,height=8)
+# plot PCA using individual Fitz Lab ID text as points colored by population
+#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/pca/plots/mosaic_fsj_individual_popcol.pdf',width=8,height=8)
 i = 1
 while (i < 13) {
-	j = i+1
-	plot(x=eig$vectors[,i], y=eig$vectors[,j], xlab=paste0("PC",i,", ",var[i],"%"), ylab=paste0("PC",j,", ",var[j],"%"), type="n")
-	#text(x=eig$vectors[,i],y=eig$vectors[,j], labels = meta$LAB_ID, col=meta$grpcol, cex=0.6) # group coloring
-	text(x=eig$vectors[,i],y=eig$vectors[,j], labels = meta$LAB_ID, col=meta$popcol, cex=0.6) # pop coloring
-	#if (i == 1) legend('topleft',fill=c(meta$grpcol[which(meta$type == "E")[1]], meta$grpcol[which(meta$type == "C")[1]], meta$grpcol[which(meta$type == "T")[1]], meta$grpcol[which(meta$type == "M4")[1]], meta$grpcol[which(meta$type == "I")[1]]), c("E","C","T","M4","I"),bty="n", horiz=TRUE, cex=0.8)
-	i = i+2
+        j = i+1
+        plot(x=eig$vectors[,i], y=eig$vectors[,j], xlab=paste0("PC",i,", ",var[i],"%"), ylab=paste0("PC",j,", ",var[j],"%"), type="n")
+        #text(x=eig$vectors[,i],y=eig$vectors[,j], labels = meta$LAB_ID, col=meta$grpcol, cex=0.6) # group coloring
+        text(x=eig$vectors[,i],y=eig$vectors[,j], labels = meta$LAB_ID, col=meta$popcol, cex=0.6) # pop coloring
+        #if (i == 1) legend('topleft',fill=c(meta$grpcol[which(meta$type == "E")[1]], meta$grpcol[which(meta$type == "C")[1]], meta$grpcol[which(meta$type == "T")[1]], meta$grpcol[which(meta$type == "M4")[1]], meta$grpcol[which(meta$type == "I")[1]]), c("E","C","T","M4","I"),bty="n", horiz=TRUE, cex=0.8)
+        i = i+2
 }
-dev.off()
+#dev.off()
 
-# plot population PCA
+# plot PCA using population code text colored by population
 idx.wellfield = which(meta$pop == "Resident" | meta$pop == "Contemporary")
-pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/pca/plots/mosaic_fsj_pop.pdf',width=8,height=8)
+#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/pca/plots/mosaic_fsj_pop.pdf',width=8,height=8)
 i=1
 while (i < 13) {
 	j = i+1
@@ -2675,9 +2715,9 @@ while (i < 13) {
 	text(x=eig$vectors[idx.wellfield,i],y=eig$vectors[idx.wellfield,j], labels = meta$popcode[idx.wellfield], col=meta$popcol[idx.wellfield], cex=1.2)
 	i = i+2
 }
-dev.off()
+#dev.off()
 
-# plot variability explained
+# plot amount of variance explained by each PC
 #pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/pca/plots/mosaic_fsj_pca_variance_explained.pdf',width=7,height=7)
 n = length(eig$vector[,1])
 for (i in 0:2) {
@@ -2685,7 +2725,10 @@ for (i in 0:2) {
 }
 #dev.off()
 
-# PC1 vs PC2 with individuals labeled by biological origin for paper
+# The following PCA was used for finalized inferences.
+
+# Plot PC1 vs PC2 with individuals labeled according to biological origin. This is the PCA displayed in the paper.
+
 meta$biopoint <- biopoint(meta$pop)
 rswk.idx = which(meta$COLOR_ID == "RSW-K")
 #meta$biopoint[rswk.idx] <- 22 # RSW-K was from Site 1B and immigrated into Little Manatee State Park (not part of The Core and was not translocated).
@@ -2714,709 +2757,9 @@ text(x=eig$vectors[,1],y=eig$vectors[,2], labels = meta$COLOR_ID, col=meta$popco
 #dev.off()
 
 
-## PCA of Wellfield C population only (2 percent minimum MAF)
 
-covar.c <- as.matrix(read.table('fsj_mosaic_biallelic_snps_main_autosomes_qc_C_minmaf2perc.covar',head=FALSE))
-eig.c <- eigen(covar.c)
-var.c <- round((eig.c$values/sum(eig.c$values))*100, digits=2)
 
-meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
-meta$LAB_ID <- as.character(meta$LAB_ID)
 
-# plot individual PCA
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/pca/plots/mosaic_fsj_individual_C_minmaf2perc.pdf',width=8,height=8)
-i = 1
-while (i < 7) {
-        j = i+1
-        plot(x=eig.c$vectors[,i], y=eig.c$vectors[,j], xlab=paste0("PC",i,", ",var.c[i],"%"), ylab=paste0("PC",j,", ",var.c[j],"%"), type="n")
-        text(x=eig.c$vectors[,i],y=eig.c$vectors[,j], labels = meta$LAB_ID[1:28], cex=0.6)
-        i = i+2
-}
-#dev.off()
-
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/pca/plots/mosaic_fsj_C_minmaf2perc_pca_variance_explained.pdf',width=7,height=7)
-n = length(eig.c$vector[,1])
-for (i in 0:2) {
-        barplot(var.c,ylab="% variance explained", xlab="PCs", names.arg=1:n,col=c(rep("gray",i*2),rep("plum4",2),rep("gray",n-(2*(i+1)))))
-}
-#dev.off()
-
-## PCA of Wellfield C population (5 percent minimum MAF)
-
-covar.c5 <- as.matrix(read.table('fsj_mosaic_biallelic_snps_main_autosomes_qc_C_minmaf5perc.covar',head=FALSE))
-eig.c5 <- eigen(covar.c5)
-var.c5 <- round((eig.c5$values/sum(eig.c5$values))*100, digits=2)
-
-meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
-meta$LAB_ID <- as.character(meta$LAB_ID)
-
-# plot individual PCA
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/pca/plots/mosaic_fsj_individual_C_minmaf5perc.pdf',width=8,height=8)
-i = 1
-while (i < 7) {
-        j = i+1
-        plot(x=eig.c5$vectors[,i], y=eig.c5$vectors[,j], xlab=paste0("PC",i,", ",var.c5[i],"%"), ylab=paste0("PC",j,", ",var.c5[j],"%"), type="n")
-        text(x=eig.c5$vectors[,i],y=eig.c5$vectors[,j], labels = meta$LAB_ID[1:28], cex=0.6)
-        i = i+2
-}
-#dev.off()
-
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/pca/plots/mosaic_fsj_C_minmaf5perc_pca_variance_explained.pdf',width=7,height=7)
-n = length(eig.c5$vector[,1])
-for (i in 0:2) {
-        barplot(var.c5,ylab="% variance explained", xlab="PCs", names.arg=1:n,col=c(rep("gray",i*2),rep("plum4",2),rep("gray",n-(2*(i+1)))))
-}
-#dev.off()
-
-## Admixture
-
-R
-
-meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
-meta$LAB_ID <- as.character(meta$LAB_ID)
-meta$type <- as.character(meta$type)
-
-fprefix='fsj_mosaic_biallelic_snps_main_autosomes_qc'
-kn = 14
-niter = 3
-groups <- meta$type
-
-cx = length(which(groups == "C"))
-ex = cx + length(which(groups == "E"))
-ix = ex + length(which(groups == "I"))
-m4x = ix + length(which(groups == "M4"))
-tx = m4x + length(which(groups == "T"))
-
-qcols = c('gold2', 'violetred2', 'turquoise2', 'tomato2', 'steelblue2', 'springgreen4', 'red4', 'navy', 'violetred', 'pink', 'lavender', 'salmon2', 'springgreen1', 'darkslategrey')
-
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/admix/plots/fsj_mosaic_biallelic_snps_main_autosomes_qc_admixture.pdf',width=10,height=7)
-
-for (k in 2:kn) {
-	par(mfrow=c(3,1))
-	for (i in 1:niter) {
-		# read in admixture proportions
-		df = read.table(paste0(fprefix,"_k",k,"_iter",i,".qopt"),head=FALSE)
-		admixp.mat <- t(as.matrix(df))
-
-		# make barplot
-		par(mar=c(5.1,5.7,4.1,2.1),mgp=c(3.8,1,0))
-		barplot(admixp.mat,col=qcols[1:k],space=0,xlab="",ylab="Ancestry proportion", main=paste0("K= ",k), axisnames=TRUE, cex.lab=1.8, cex.axis=1.8, names.arg=meta$LAB_ID, cex.names=0.8, las=2)
-		
-		# add group demarcations
-		lines(x<-c(cx,cx),y<-c(0,1),col="grey100",lwd=2, lty=1)
-		lines(x<-c(ex,ex),y<-c(0,1),col="grey100",lwd=2, lty=1)
-		lines(x<-c(ix,ix),y<-c(0,1),col="grey100",lwd=2, lty=1)
-		lines(x<-c(m4x,m4x),y<-c(0,1),col="grey100",lwd=2, lty=1)
-		lines(x<-c(tx,tx),y<-c(0,1),col="grey100",lwd=2, lty=1)
-	}
-}
-#dev.off()
-
-# plot all iterations for K of 3,6,9,10,14
-outprefix='/home/tyler/Dropbox/research/jay/mosaic/popgen/admix/plots/fsj_mosaic_biallelic_snps_main_autosomes_qc_k'
-niter = 20
-for (k in c(3,6,9,10,14)) {
-	pdf(file=paste0(outprefix,k,".pdf"))
-	par(mfrow=c(3,1))
-	for (i in 1:niter) {
-		# read in admixture proportions
-		df = read.table(paste0(fprefix,"_k",k,"_iter",i,".qopt"),head=FALSE)
-		admixp.mat <- t(as.matrix(df))
-
-		# make barplot
-		par(mar=c(5.1,5.7,4.1,2.1),mgp=c(3.8,1,0))
-		barplot(admixp.mat,col=qcols[1:k],space=0,xlab="",ylab="Ancestry proportion", main=paste0("K= ",k), axisnames=TRUE, cex.lab=1.8, cex.axis=1.8, names.arg=meta$LAB_ID, cex.names=0.6, las=2)
-		
-		# add group demarcations
-		lines(x<-c(cx,cx),y<-c(0,1),col="grey100",lwd=2, lty=1)
-		lines(x<-c(ex,ex),y<-c(0,1),col="grey100",lwd=2, lty=1)
-		lines(x<-c(ix,ix),y<-c(0,1),col="grey100",lwd=2, lty=1)
-		lines(x<-c(m4x,m4x),y<-c(0,1),col="grey100",lwd=2, lty=1)
-		lines(x<-c(tx,tx),y<-c(0,1),col="grey100",lwd=2, lty=1)
-	}
-	dev.off()
-}
-
-# Determine optimal K
-
-icer_workdir='/mnt/ufs18/rs-012/Fitz_Lab/projects/mosaic/popgen/admix'
-
-Collect likelihoods for different admixture runs
-$ echo "$(printf '\tK%s' {1..16} | sed 's/^\t//')" >> fsj_mosaic_biallelic_snps_main_autosomes_qc_likes.txt
-$ for i in {1..20}; do lkstr=""; for K in {1..16}; do lk=$(grep "best like=" fsj_mosaic_biallelic_snps_main_autosomes_qc_k${K}_iter${i}.log | cut -f2 -d '=' | perl -ne 'print "$1\n" if ($_ =~ /^(\S+)/)'); lkstr+=" ${lk}"; done; lkstr=$(echo "$lkstr" | sed 's/^ //' | sed 's/ /\t/g'); printf "%s\n" "$lkstr" >> fsj_mosaic_biallelic_snps_main_autosomes_qc_likes.txt; done;
-
-Use Evanno 2005 delta K method to find best K
-
-R
-
-lk <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/admix/fsj_mosaic_biallelic_snps_main_autosomes_qc_likes.txt',head=TRUE)
-nk <- c(1:16)
-lk.mean <- sapply(1:ncol(lk),function(x,df){mean(df[,x])},df=lk)
-lk.sd <- sapply(1:ncol(lk),function(x,df){sd(df[,x])},df=lk) # mean likelihoods
-lk.delta <- sapply(2:(ncol(lk)-1),function(i,df){mean(abs(df[,i+1] - 2*lk[,i] + lk[,i-1]))/sd(lk[,i])},df=lk)
-
-# plot mean
-pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/admix/plots/k_fit.pdf')
-plot(x=nk,y=lk.mean, ylab="Mean log likelihood", xlab="K") # plot means
-arrows(nk,lk.mean-lk.sd,nk,lk.mean+lk.sd,code=3,length=0.06,angle=90) # error bars
-
-# plot delta K
-plot(x=2:(ncol(lk)-1), y=lk.delta,type="b", xlab="K", ylab="Delta K")
-dev.off()
-
-## Tree
-
-fsj_mosaic_biallelic_snps_main_autosomes_qc_all.dist distances are -log(1-raw_p_dist) transformed.
-To transform distances to raw p-distances, raw_p = 1 - exp(-1*transformed_p)
-
-icer_workdir='/mnt/research/Fitz_Lab/projects/mosaic/popgen/tree'
-
-# extract out full dataset tree
-$ head -n1 fsj_mosaic_biallelic_snps_main_autosomes_qc_all_boot.nwk > fsj_mosaic_biallelic_snps_main_autosomes_qc_all.nwk
-
-# extract out bootstrap trees (10k block bootstraps)
-$ tail -n +2 fsj_mosaic_biallelic_snps_main_autosomes_qc_all_boot.nwk | awk 'NF' > fsj_mosaic_biallelic_snps_main_autosomes_qc_all.boot.nwk
-
-# add boostrap suppor to main NJ tree
-$ raxml-ng --support --tree fsj_mosaic_biallelic_snps_main_autosomes_qc_all.nwk --bs-trees fsj_mosaic_biallelic_snps_main_autosomes_qc_all.boot.nwk --prefix fsj_mosaic_biallelic_snps_main_autosomes_qc_all
-
-# plot tree with bootstrap support
-
-R
-
-library(phytools)
-
-njtree <- read.tree('/home/tyler/Dropbox/research/jay/mosaic/popgen/tree/fsj_mosaic_biallelic_snps_main_autosomes_qc_all.raxml.support')
-
-meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
-meta$popcode <- popletters(meta)
-meta$popcol <- popcolor(meta)
-#meta$letter_code <- pointletters(meta)
-#meta$grpcol <- pntcol(meta)
-meta$grpcol <- sitecol(meta)
-
-#tipcol <- as.character(meta$type[match(njtree$tip.label, meta$LAB_ID)])
-#tipcol <- pntcol(tipcol)
-#tipcol <- as.character(meta$grpcol[match(njtree$tip.label, meta$LAB_ID)])
-tipcol <- as.character(meta$popcol[match(njtree$tip.label, meta$LAB_ID)])
-
-#site <- as.character(meta$site[match(njtree$tip.label, meta$LAB_ID)])
-#njtree$tip.label = paste0(njtree$tip.label,", ",site)
-#njtree$tip.label = gsub("^I", "U", njtree$tip.label) # change "I" to "U"
-pop <- as.character(meta$pop[match(njtree$tip.label, meta$LAB_ID)])
-pop.abr <- as.character(meta$popcode[match(njtree$tip.label, meta$LAB_ID)])
-njtree$tip.label <- paste0(njtree$tip.label, "-", pop.abr)
-
-node.label.new <- as.character(as.numeric(njtree$node.label)/100)
-node.label.new[is.na(node.label.new)] <- ""
-njtree$node.label <- node.label.new
-
-# plot genome-wide trees a few different ways
-# see ?plot.phylo for options
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/tree/plot/mosaic_fsj_nj_tree_colors2.pdf')
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/tree/plot/mosaic_fsj_nj_tree_colors2_print.pdf')
-pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/tree/plot/mosaic_fsj_nj_tree_pop_labels_print.pdf')
-#plot(njtree,type="phylogram",lab4ut="axial",no.margin=TRUE,cex=0.4,align.tip.label=FALSE, show.node.label=TRUE, tip.color=tipcol, underscore=TRUE)
-#plot(njtree,type="radial",lab4ut="axial",no.margin=TRUE,cex=0.4,align.tip.label=FALSE, show.node.label=TRUE, tip.color=tipcol, underscore=TRUE)
-#plot(njtree,type="unrooted",lab4ut="axial",no.margin=TRUE,cex=0.4,align.tip.label=FALSE, show.node.label=FALSE, tip.color=tipcol)
-plot(njtree,type="unrooted",lab4ut="axial",no.margin=TRUE,cex=0.8,align.tip.label=FALSE, show.node.label=FALSE, tip.color=tipcol, underscore=TRUE)
-#dev.off()
-
-## Distance matrix
-
-library(gplots) # heatmap.2()
-library(viridis)
-
-dist.mat <- as.matrix(read.table('~/Dropbox/research/jay/mosaic/popgen/tree/fsj_mosaic_biallelic_snps_main_autosomes_qc_all.dist.matrix',head=FALSE)) # -log(1-raw_p_dist)
-dist.raw <- 1 - exp(-1*dist.mat) # raw p-distance
-
-meta$pop.names <- popnames(meta)
-colnames(dist.raw) <- paste0(meta$LAB_ID," ",meta$pop.names)
-rownames(dist.raw) <- paste0(meta$LAB_ID," ",meta$pop.names)
-
-# Ordered using Ward's minimum variance clustering of euclidean distances between rows (i.e. individuals). Row/Column ordering by row means.
-pdf('/home/tyler/Dropbox/research/jay/mosaic/popgen/tree/plot/pairwise_dist_ward.pdf', width=10, height=10)
-
-heatmap.2(dist.raw, symm = TRUE, breaks = 40, trace="none", dendrogram="column", Rowv=TRUE, colCol=meta$popcol, colRow=meta$popcol, col=viridis, margins=c(7,7), cexRow=0.55, cexCol=0.55, offsetRow=-0.5, offsetCol=-0.5, key.title=NA, keysize=1, hclustfun = function(x) hclust(x,method="ward.D"), distfun=function(x)dist(x,method="euclidean"))
-
-dev.off()
-
-
-## Relatedness
-
-R
-library(gplots) # heatmap.2()
-library(viridis) # plasma colors
-
-df <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness.txt',head=TRUE)
-meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
-meta$pop.names <- popnames(meta)
-meta$popcol <- popcolor(meta)
-
-# convert pairwise comparisons into a matrix
-n = 87
-rmat <- matrix(ncol=n, nrow=n)
-
-for (i in 1:n) {
-	iidx = i-1
-	for (j in 1:n) {
-		jidx = j-1
-		if (i == j) {
-			rmat[i,j] = NA
-		} else if (!is.na(rmat[j,i])) {
-			rmat[i,j] = rmat[j,i]
-			#if (j < i) rmat[i,j] = NA # this makes half matrix
-		} else {
-			rmat[i,j] = df$rab[which(df$a == iidx & df$b == jidx)]
-		}
-	}
-}
-
-# make output matrix
-#colnames(rmat) <- paste0(meta$LAB_ID,":",gsub(" ", "_", meta$pop.names))
-#rownames(rmat) <- paste0(meta$LAB_ID,":",gsub(" ", "_", meta$pop.names))
-#write.table(rmat,file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix.txt',col.names=TRUE,row.names=TRUE,quote=FALSE,sep="\t")
-#write.table(rmat,file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/#fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix.nonames.txt',col.names=FALSE,row.names=FALSE,quote=FALSE,sep="\t")
-
-colnames(rmat) <- paste0(meta$LAB_ID," ",meta$pop.names)
-rownames(rmat) <- paste0(meta$LAB_ID," ",meta$pop.names)
-
-pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/pairwise_relate_matrix_Ward_clustering.pdf',width=10,height=10)
-
-heatmap.2(rmat, symm = TRUE, breaks = 40, trace="none", dendrogram="column", Rowv=TRUE, colCol=meta$popcol, colRow=meta$popcol, col=viridis, margins=c(7,7), cexRow=0.55, cexCol=0.55, offsetRow=-0.5, offsetCol=-0.5, key.title=NA, keysize=1, hclustfun = function(x) hclust(x,method="ward.D"), distfun=function(x)dist(x,method="euclidean"))
-
-dev.off()
-
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/pairwise_relate_matrix_Ward_clustering_modkey.pdf',width=10,height=10)
-#heatmap.2(rmat, symm = TRUE, breaks = 40, trace="none", dendrogram="column", Rowv=TRUE, colCol=meta$popcol, colRow=meta$popcol, col=viridis, margins=c(7,7), cexRow=0.55, cexCol=0.55, offsetRow=-0.5, offsetCol=-0.5, key.title=NA, keysize=1, hclustfun = function(x) hclust(x,method="ward.D"), distfun=function(x)dist(x,method="euclidean"), density.info='none') # version without key density
-#dev.off()
-
-
-pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/pairwise_relate_matrix_complete_linkage_clustering.pdf',width=10,height=10)
-
-heatmap.2(rmat, symm = TRUE, breaks = 40, trace="none", dendrogram="column", Rowv=TRUE, colCol=meta$popcol, colRow=meta$popcol, col=viridis, margins=c(7,7), cexRow=0.55, cexCol=0.55, offsetRow=-0.5, offsetCol=-0.5, key.title=NA, keysize=1, hclustfun = function(x) hclust(x,method="complete"), distfun=function(x)dist(x,method="euclidean"))
-
-dev.off()
-
-# make sorted version of r matrix
-meta.sort <- meta[c(which(meta$pop == "Contemporary"), which(meta$pop == "Resident"), which(meta$pop == "SITE_1"),
-which(meta$pop == "SITE_12"), which(meta$pop == "SITE_13"), which(meta$pop == "SITE_18"), which(meta$pop == "TEXACO"), 
-which(meta$pop == "Brigman"), which(meta$pop == "Duette_headwaters"), which(meta$pop == "Golden_Aster_Scrub"), 
-which(meta$pop == "W.Balm"), which(meta$pop == "Sun_City")),]
-
-meta.sort$popcol <- popcolor(meta.sort)
-meta.sort$pop.names <- popnames(meta.sort)
-
-df$a.ind <- meta$LAB_ID[df$a+1]
-df$b.ind <- meta$LAB_ID[df$b+1]
-rmat.sort <- matrix(ncol=n, nrow=n)
-
-for (i in 1:n) {
-	id.a = meta.sort$LAB_ID[i]
-	for (j in 1:n) {
-		id.b = meta.sort$LAB_ID[j]
-		if (i == j) {
-			rmat.sort[i,j] = NA
-			next
-		}
-		rmat.sort[i,j] = df$rab[which((df$a.ind == id.a & df$b.ind == id.b) | (df$a.ind == id.b & df$b.ind == id.a))]
-	}
-}
-
-#rmat.sort[which(upper.tri(rmat.sort) == FALSE)] = NA
-#colnames(rmat.sort) = paste0(meta.sort$LAB_ID,"_",as.character(meta.sort$site))
-#rownames(rmat.sort) = paste0(meta.sort$LAB_ID,"_",as.character(meta.sort$site))
-
-rmat.sort <- apply(rmat.sort,2,rev) # reverse matrix for consisting plotting
-colnames(rmat.sort) = paste0(meta.sort$LAB_ID," ",meta.sort$pop.names)
-rownames(rmat.sort)= (paste0(meta.sort$LAB_ID," ",meta.sort$pop.names))[n:1]
-
-# plot updated heatmap (reassigned "I" individuals)
-pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/pairwise_relate_matrix_pop_order.pdf',width=10,height=10)
-
-heatmap.2(rmat.sort, breaks=20, Rowv=FALSE,Colv=FALSE,dendrogram=c("none"),keysize=1,trace="none", margins=c(7,7),col=plasma,cexRow=0.55, cexCol=0.55, offsetRow=-0.5, offsetCol=-0.5, colCol=meta.sort$popcol, colRow=meta.sort$popcol[n:1], colsep=c(86,85,83,80,74,71,70,51,49,44,28), rowsep=c(1,2,4,7,13,16,17,36,38,43,59),sepcolor="white",sepwidth=c(0.01,0.01),key.title=NA)
-
-dev.off()
-
-pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/pairwise_relate_matrix_pop_order_viridis.pdf',width=10,height=10)
-
-heatmap.2(rmat.sort, breaks=20, Rowv=FALSE,Colv=FALSE,dendrogram=c("none"),keysize=1,trace="none", margins=c(7,7),col=viridis,cexRow=0.55, cexCol=0.55, offsetRow=-0.5, offsetCol=-0.5, colCol=meta.sort$popcol, colRow=meta.sort$popcol[n:1], colsep=c(86,85,83,80,74,71,70,51,49,44,28), rowsep=c(1,2,4,7,13,16,17,36,38,43,59),sepcolor="white",sepwidth=c(0.01,0.01),key.title=NA)
-
-dev.off()
-
-# distribution of inbreeding within pops
-ew = grep("^E_\\d+_Wellfield", colnames(rmat),perl=TRUE)
-cw = grep("^C_\\d+_Wellfield", colnames(rmat),perl=TRUE)
-s1 = grep("^T_\\d+_SITE_1$", colnames(rmat),perl=TRUE)
-s12 = grep("^T_\\d+_SITE_12", colnames(rmat),perl=TRUE)
-s13 = grep("^T_\\d+_SITE_13", colnames(rmat),perl=TRUE)
-#s18 = grep("^T_\\d+_SITE_18", colnames(rmat),perl=TRUE)
-tx = grep("^T_\\d+_TEXACO", colnames(rmat),perl=TRUE)
-m4g = grep("^M4_\\d+_Golden", colnames(rmat),perl=TRUE)
-m4b = grep("^M4_\\d+_Brigman", colnames(rmat),perl=TRUE)
-#m4a = grep("^M4_\\d+_W.Balm", colnames(rmat),perl=TRUE)
-m4d = grep("^M4_\\d+_Duette", colnames(rmat),perl=TRUE)
-#m4s = grep("^M4_\\d+_Sun", colnames(rmat),perl=TRUE)
-imis = grep("^I_\\d+_missing", colnames(rmat),perl=TRUE)
-
-ewr = c(rmat[ew,ew])
-cwr = c(rmat[cw,cw])
-s1r = c(rmat[s1,s1])
-s12r = c(rmat[s12,s12])
-s13r = c(rmat[s13,s13])
-txr = c(rmat[tx,tx])
-m4gr = c(rmat[m4g,m4g])
-m4br = c(rmat[m4b,m4b])
-m4dr = c(rmat[m4d,m4d])
-imisr = c(rmat[imis,imis])
-
-popr <- NULL
-popr <- rbind(popr, data.frame(pop=rep("E_Wellfield",length(ewr)), r=ewr))
-popr <- rbind(popr, data.frame(pop=rep("C_Wellfield",length(cwr)), r=cwr))
-popr <- rbind(popr, data.frame(pop=rep("S1",length(s1r)), r=s1r))
-popr <- rbind(popr, data.frame(pop=rep("S12",length(s12r)), r=s12r))
-popr <- rbind(popr, data.frame(pop=rep("S13",length(s13r)), r=s13r))
-popr <- rbind(popr, data.frame(pop=rep("TEXACO",length(txr)), r=txr))
-popr <- rbind(popr, data.frame(pop=rep("Golden_Aster",length(m4gr)), r=m4gr))
-popr <- rbind(popr, data.frame(pop=rep("Brigman",length(m4br)), r=m4br))
-popr <- rbind(popr, data.frame(pop=rep("Duette",length(m4dr)), r=m4dr))
-popr <- rbind(popr, data.frame(pop=rep("immigrant",length(imisr)), r=imisr))
-popr <- popr[which(!is.na(popr$r)),]
-
-# calculate average relatedness among individuals per groups
-rsummary <- NULL
-rsummary <- rbind(rsummary,data.frame(comp="C vs C", mean=mean(df$rab[which(df$a >= 0 & df$a < 28 & df$b >= 0 & df$b < 28)]), sd=sd(df$rab[which(df$a >= 0 & df$a < 28 & df$b >= 0 & df$b < 28)])))
-rsummary <- rbind(rsummary,data.frame(comp="C vs E", mean=mean(df$rab[which(df$a >= 0 & df$a < 28 & df$b >= 28 & df$b < 39)]), sd=sd(df$rab[which(df$a >= 0 & df$a < 28 & df$b >= 28 & df$b < 39)])))
-rsummary <- rbind(rsummary,data.frame(comp="C vs I", mean=mean(df$rab[which(df$a >= 0 & df$a < 28 & df$b >= 39 & df$b < 45)]), sd=sd(df$rab[which(df$a >= 0 & df$a < 28 & df$b >= 39 & df$b < 45)])))
-rsummary <- rbind(rsummary,data.frame(comp="C vs M4", mean=mean(df$rab[which(df$a >= 0 & df$a < 28 & df$b >= 45 & df$b < 58)]), sd=sd(df$rab[which(df$a >= 0 & df$a < 28 & df$b >= 45 & df$b < 58)])))
-rsummary <- rbind(rsummary,data.frame(comp="C vs T", mean=mean(df$rab[which(df$a >= 0 & df$a < 28 & df$b >= 58 & df$b < 87)]), sd=sd(df$rab[which(df$a >= 0 & df$a < 28 & df$b >= 58 & df$b < 87)])))
-rsummary <- rbind(rsummary,data.frame(comp="E vs E", mean=mean(df$rab[which(df$a >= 28 & df$a < 39 & df$b >= 28 & df$b < 39)]), sd=sd(df$rab[which(df$a >= 28 & df$a < 39 & df$b >= 28 & df$b < 39)])))
-rsummary <- rbind(rsummary,data.frame(comp="E vs I", mean=mean(df$rab[which(df$a >= 28 & df$a < 39 & df$b >= 39 & df$b < 45)]), sd=sd(df$rab[which(df$a >= 28 & df$a < 39 & df$b >= 39 & df$b < 45)])))
-rsummary <- rbind(rsummary,data.frame(comp="E vs M4", mean=mean(df$rab[which(df$a >= 28 & df$a < 39 & df$b >= 45 & df$b < 58)]), sd=sd(df$rab[which(df$a >= 28 & df$a < 39 & df$b >= 45 & df$b < 58)])))
-rsummary <- rbind(rsummary,data.frame(comp="E vs T", mean=mean(df$rab[which(df$a >= 28 & df$a < 39 & df$b >= 58 & df$b < 87)]), sd=sd(df$rab[which(df$a >= 28 & df$a < 39 & df$b >= 58 & df$b < 87)])))
-rsummary <- rbind(rsummary,data.frame(comp="I vs I", mean=mean(df$rab[which(df$a >= 39 & df$a < 45 & df$b >= 39 & df$b < 45)]), sd=sd(df$rab[which(df$a >= 39 & df$a < 45 & df$b >= 39 & df$b < 45)])))
-rsummary <- rbind(rsummary,data.frame(comp="I vs M4", mean=mean(df$rab[which(df$a >= 39 & df$a < 45 & df$b >= 45 & df$b < 58)]), sd=sd(df$rab[which(df$a >= 39 & df$a < 45 & df$b >= 45 & df$b < 58)])))
-rsummary <- rbind(rsummary,data.frame(comp="I vs T", mean=mean(df$rab[which(df$a >= 39 & df$a < 45 & df$b >= 58 & df$b < 87)]), sd=sd(df$rab[which(df$a >= 39 & df$a < 45 & df$b >= 58 & df$b < 87)])))
-rsummary <- rbind(rsummary,data.frame(comp="M4 vs M4", mean=mean(df$rab[which(df$a >= 45 & df$a < 58 & df$b >= 45 & df$b < 58)]), sd=sd(df$rab[which(df$a >= 45 & df$a < 58 & df$b >= 45 & df$b < 58)])))
-rsummary <- rbind(rsummary,data.frame(comp="M4 vs T", mean=mean(df$rab[which(df$a >= 45 & df$a < 58 & df$b >= 58 & df$b < 87)]), sd=sd(df$rab[which(df$a >= 45 & df$a < 58 & df$b >= 58 & df$b < 87)])))
-rsummary <- rbind(rsummary,data.frame(comp="T vs T", mean=mean(df$rab[which(df$a >= 58 & df$a < 87 & df$b >= 58 & df$b < 87)]), sd=sd(df$rab[which(df$a >= 58 & df$a < 87 & df$b >= 58 & df$b < 87)])))
-
-nlab=NULL
-for (id in unique(popr$pop)) { n=length(which(popr$pop==id)); nlab=c(nlab,paste0("(",n,")")) }
-
-# plot relatedness info
-
-# plot heatmap
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness.pdf')
-heatmap.2(rmat,Rowv=FALSE,Colv=FALSE,dendrogram=c("none"),keysize=1,density.info="none",trace="none",revC=TRUE,margins=c(9,9),rowsep=c(29,42,48,59),colsep=c(28,39,45,58),sepcolor="white",col=plasma, cexRow=0.3, cexCol=0.3)
-
-# plot sorted heatmap
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_sorted.pdf')
-pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_sorted_print.pdf',width=10,height=10)
-#heatmap.2(rmat.sort,Rowv=FALSE,Colv=FALSE,dendrogram=c("none"),keysize=1,density.info="none",trace="none",revC=TRUE,margins=c(9,9),rowsep=c(29,42,48,59),colsep=c(28,39,45,58),sepcolor="white",col=plasma, cexRow=0.3, cexCol=0.3, colCol=meta.sort$labcol, colRow=meta.sort$labcol[87:1], labRow=rownames(rmat.sort)[87:1])
-heatmap.2(rmat.sort,Rowv=FALSE,Colv=FALSE,dendrogram=c("none"),keysize=1,density.info="none",trace="none",revC=TRUE,margins=c(9,9),rowsep=c(29,42,48,59),colsep=c(28,39,45,58),sepcolor="white",col=plasma, cexRow=0.5, cexCol=0.5, colCol=meta.sort$labcol, colRow=meta.sort$labcol[87:1], labRow=rownames(rmat.sort)[87:1])
-dev.off()
-
-# mean group pairwise scatterplot
-plot(x=1:nrow(rsummary), y=rsummary$mean, ylab="Pairwise relatedness (r)", xlab="", xaxt="n",ylim=c(0,0.24),pch=19,cex=1.3, cex.axis=1.2,cex.lab=1.2)
-arrows(1:nrow(rsummary),rsummary$mean-rsummary$sd,1:nrow(rsummary),rsummary$mean+rsummary$sd,code=3,length=0.06,angle=90,lwd=1.2)
-axis(side=1, at=1:nrow(rsummary), labels=as.character(rsummary$comp), tick=FALSE, las=2, cex=1.2)
-
-#dev.off()
-
-# plot population boxplots
-pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_pop_boxplot.pdf',width=11,height=7)
-plot(popr$r ~ popr$pop, xlab="Population", ylab="Pairwise relatedness (r)", col="grey",cex.lab=1.2, cex.axis=1.2, xaxt="n",ylim=c(0,0.7))
-axis(side=1, at=1:length(unique(popr$pop)), labels=as.character(unique(popr$pop)), tick=TRUE, cex.axis=0.8)
-axis(side=1, at=1:length(unique(popr$pop)), labels=nlab, tick=FALSE, cex.axis=0.8, padj=1.5)
-#dev.off()
-
-## ranked relatedness matrix plot
-
-R
-
-library(plot.matrix)
-library(scales)
-
-df <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness.txt',head=TRUE)
-meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
-meta$LAB_ID = as.character(meta$LAB_ID)
-meta$popnice <- popnames(meta)
-
-#meta$type.loc = paste0(meta$type,"_",meta$site)
-#meta$id.full = paste0(meta$LAB_ID,"_",meta$site)
-#meta$id.full = paste0(meta$LAB_ID,"_",meta$pop)
-meta$id.full = paste0(meta$LAB_ID,":",meta$popnice)
-
-# assign colors
-meta$id.col <- popcolor(meta)
-
-# assign code
-meta$id.code <- replace(meta$pop, which(meta$pop == "Contemporary"), "1")
-meta$id.code <- replace(meta$id.code, which(meta$id.code == "Resident"), "2")
-meta$id.code <- replace(meta$id.code, which(meta$id.code == "SITE_1"), "3")
-meta$id.code <- replace(meta$id.code, which(meta$id.code == "SITE_12"), "4")
-meta$id.code <- replace(meta$id.code, which(meta$id.code == "SITE_13"), "5")
-meta$id.code <- replace(meta$id.code, which(meta$id.code == "SITE_18"), "6")
-meta$id.code <- replace(meta$id.code, which(meta$id.code == "TEXACO"), "7")
-meta$id.code <- replace(meta$id.code, which(meta$id.code == "Brigman"), "8")
-meta$id.code <- replace(meta$id.code, which(meta$id.code == "Duette_headwaters"), "9")
-meta$id.code <- replace(meta$id.code, which(meta$id.code == "Golden_Aster_Scrub"), "10")
-meta$id.code <- replace(meta$id.code, which(meta$id.code == "Sun_City"), "11")
-meta$id.code <- replace(meta$id.code, which(meta$id.code == "W.Balm"), "12")
-meta$id.code <- as.numeric(meta$id.code)
-
-colvec <- c(sapply(1:12,function(x,df){meta$id.col[which(meta$id.code == x)[1]]},df=meta),"gray90")
-
-#df$a.typeloc <- meta$type.loc[df$a+1]
-#df$b.typeloc <- meta$type.loc[df$b+1]
-df$a.pop <- meta$pop[df$a+1]
-df$b.pop <- meta$pop[df$b+1]
-df$a.id.full <- meta$id.full[df$a+1]
-df$b.id.full <- meta$id.full[df$b+1]
-
-# set up matrices for plotting
-
-codemat <- matrix(nrow=87,ncol=87)
-valmat <- matrix(nrow=87,ncol=87)
-colmat <- matrix(nrow=87, ncol=87)
-indmat <- matrix(nrow=87, ncol=87)
-rcutoff = 0.004222888 # average relatedness between translocated and Residents 
-for (idx in 0:86) {
-	i = idx+1
-	df.sub <- df[which(df$a == idx | df$b == idx),c(1,2,13,34:37)]
-	df.sub.ord <- df.sub[order(-df.sub$rab),]
-	namevec <- ifelse(df.sub.ord$a == idx, df.sub.ord$b.pop, df.sub.ord$a.pop)
-	indvec <- ifelse(df.sub.ord$a == idx, df.sub.ord$b.id.full, df.sub.ord$a.id.full)
-	codevec <- sapply(namevec,function(x,df){df$id.code[which(df$pop == x)[1]]},USE.NAMES=FALSE, df=meta)
-	colarr <- sapply(namevec,function(x,df){df$id.col[which(df$pop == x)[1]]},USE.NAMES=FALSE, df=meta)
-	# mask-code comparisons with rab < cutoff
-	codevec[which(df.sub.ord$rab < rcutoff)] <- 13
-	codemat[i,] <- c(meta$id.code[i], codevec)
-	colarr[which(df.sub.ord$rab < rcutoff)] <- "gray90"
-	colmat[i,] <- c(meta$id.col[i], colarr)
-	valmat[i,] <- c(1,df.sub.ord$rab)
-	indmat[i,] <- c(meta$id.full[i], indvec)
-}
-
-# write ranked relatedness matrix
-
-#write.table(indmat, file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_ranked.txt',col.names=FALSE, row.names=FALSE, sep="\t", quote=FALSE)
-#rownames(valmat) <- meta$id.full
-#write.table(valmat, file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_ranked_values.txt', col.names=FALSE, row.names=TRUE, sep="\t", quote=FALSE)
-
-# group rows of matrices by population
-
-popidx <- c(grep("Contemporary",indmat[,1]), grep("Resident",indmat[,1]), grep("Site 1$",indmat[,1]), grep("Site 12",indmat[,1]), grep("Site 13",indmat[,1]), grep("Site 18",indmat[,1]), grep("Texaco",indmat[,1]), grep("Brigman",indmat[,1]), grep("Duette headwaters",indmat[,1]), grep("Golden Aster Scrub",indmat[,1]), grep("Sun City",indmat[,1]), grep("W. Balm",indmat[,1]))
-
-codemat <- codemat[popidx,]
-valmat <- valmat[popidx,]
-colmat <- colmat[popidx,]
-indmat <- indmat[popidx,]
-
-# make plot legend
-
-groups <- unique(meta$pop)
-group.col <- sapply(groups,function(x,df){df$id.col[which(df$pop == x)[1]]},USE.NAMES=FALSE,df=meta)
-
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_ranked.pdf')
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_ranked_colors2.pdf')
-pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_ranked_popcolors.pdf')
-
-plot.new()
-legend('topleft',legend=groups, fill=group.col, bty='n', cex=1.8)
-
-# plot all individuals - solid colors
-
-plot(codemat,col=colvec,breaks=seq(from=1,to=15,by=1), key=NULL, axis.col=list(side=1, labels=FALSE, tick=FALSE), axis.row=list(side=2, labels=FALSE, tick=FALSE), ylab="", xlab="", main=NA, polygon.cell=list(lwd=0.2,lty=1,col=alpha("gray80",0.3))) # without indicating relatedness intensity
-title(ylab="Individual",line=0.5,cex.lab=1.2)
-title(xlab="Ranked pairwise relatedness",line=0.5,cex.lab=1.2)
-
-abline(v=1.45,col="white",lwd=3) # add break line
-
-# plot all individuals with relatedness intensity mask
-
-plot(codemat,col="white", key=NULL, axis.col=list(side=1, labels=FALSE, tick=FALSE), axis.row=list(side=2, labels=FALSE, tick=FALSE), ylab="", xlab="", main=NA, polygon.cell=list(border=NA)) # with relatedness intensity
-title(ylab="Individual",line=0.5,cex.lab=1.2)
-title(xlab="Ranked pairwise relatedness",line=0.5,cex.lab=1.2)
-
-yt=nrow(valmat)+1.5
-for (i in 1:nrow(valmat)) {
-	yt = yt-1
-	yb = yt-1
-	xl=-0.5
-	for (j in 1:ncol(valmat)) {
-		xl = xl+1
-		xr = xl+1
-		#rect(xleft=xl, xright=xr, ybottom=yb, ytop=yt, border=NA, col=alpha("black",0.7*(1-valmat[i,j])))
-		#rect(xleft=xl, xright=xr, ybottom=yb, ytop=yt, border=NA, col=alpha("white",0.6*(1-valmat[i,j])))
-		rect(xleft=xl, xright=xr, ybottom=yb, ytop=yt, border=alpha("gray80",0.3), col=alpha(colmat[i,j],2.5*valmat[i,j]))
-	}
-}
-
-abline(v=1.45,col="white",lwd=3) # add break line
-
-# plot Residents and Contemporary Wellfield individuals - solid colors
-
-submat <- codemat[1:44,]
-subval <- valmat[1:44,]
-
-plot(submat,col=colvec,breaks=seq(from=1,to=15,by=1), key=NULL, axis.col=list(side=1, labels=FALSE, tick=FALSE), axis.row=list(side=2, labels=FALSE, tick=FALSE), ylab="", xlab="", main=NA, polygon.cell=list(lwd=0.2,lty=1,col=alpha("gray80",0.3))) # without intensity
-title(ylab="Individual",line=0.5,cex.lab=1.2)
-title(xlab="Ranked pairwise relatedness",line=0.5,cex.lab=1.2)
-
-abline(v=1.45,col="white",lwd=3)
-
-# plot Residents and Contemporary only with relatedness intensity mask
-
-plot(submat,col="white", key=NULL, axis.col=list(side=1, labels=FALSE, tick=FALSE), axis.row=list(side=2, labels=FALSE, tick=FALSE), ylab="", xlab="", main=NA, polygon.cell=list(border=NA)) # with relatedness intensity
-title(ylab="Individual",line=0.5,cex.lab=1.2)
-title(xlab="Ranked pairwise relatedness",line=0.5,cex.lab=1.2)
-
-# add intensity mask to submatrix
-
-yt=nrow(subval)+1.5
-for (i in 1:nrow(subval)) {
-	yt = yt-1
-	yb = yt-1
-	xl=-0.5
-	for (j in 1:ncol(subval)) {
-		xl = xl+1
-		xr = xl+1
-		#rect(xleft=xl, xright=xr, ybottom=yb, ytop=yt, border=NA, col=alpha("black",0.7*(1-subval[i,j])))
-		#rect(xleft=xl, xright=xr, ybottom=yb, ytop=yt, border=NA, col=alpha("white",0.6*(1-subval[i,j])))
-		rect(xleft=xl, xright=xr, ybottom=yb, ytop=yt, border=alpha("gray80",0.3), col=alpha(colmat[i,j],2.5*subval[i,j]))
-	}
-}
-
-abline(v=1.45,col="white",lwd=3) # add break line
-#dev.off()
-
-# make color intensity legend for submatrix
-
-gradmat <- matrix(seq(from=1, to=0, by=-0.125),nrow=1)
-gradmat.col <- matrix(rep("red",ncol(gradmat)),nrow=1)
-
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_ranked_colors2_scale.pdf')
-plot(gradmat,col="white", key=NULL, axis.col=list(side=1, labels=FALSE, tick=FALSE), axis.row=list(side=2, labels=FALSE, tick=FALSE), ylab="", xlab="", main=NA, polygon.cell=list(border=NA)) # with relatedness intensity
-title(ylab="Individual",line=0.5,cex.lab=1.2)
-title(xlab="Ranked pairwise relatedness",line=0.5,cex.lab=1.2)
-
-yt=nrow(gradmat)+1.5
-for (i in 1:nrow(gradmat)) {
-	yt = yt-1
-	yb = yt-1
-	xl=-0.5
-	for (j in 1:ncol(gradmat)) {
-		xl = xl+1
-		xr = xl+1
-		#rect(xleft=xl, xright=xr, ybottom=yb, ytop=yt, border=NA, col=alpha("black",0.7*(1-gradmat[i,j])))
-		#rect(xleft=xl, xright=xr, ybottom=yb, ytop=yt, border=NA, col=alpha("white",0.6*(1-gradmat[i,j])))
-		rect(xleft=xl, xright=xr, ybottom=yb, ytop=yt, border=alpha("gray80",0.3), col=alpha(gradmat.col[i,j],gradmat[i,j]))
-	}
-}
-
-#dev.off()
-
-# plot Contemporary only with relatedness demarcations
-
-cmat <- codemat[1:28,]
-cval <- valmat[1:28,]
-cnames <- sapply(indmat[1:28,1],function(x){strsplit(x,":")[[1]][1]},USE.NAMES=FALSE)
-ncnames <- apply(indmat,c(1,2),function(x){strsplit(x,":")[[1]][1]})
-min.relate = 0.004222888
-
-# find contemporary individual with most relatives with relatedness > 0.004222888 (average relatedness of translocated to Residents).
-colmax = 0
-for (i in 1:nrow(cval)) {
-	tr = 0
-	for (j in 1:nrow(cval)) {
-		tr = tr+1
-		if (cval[i,j] < min.relate) break
-	}
-	if (tr > colmax) colmax = tr
-}
-
-x11(width=10,height=13)
-pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/contemporary_ranked_matrix.pdf',width=10,height=13)
-
-plot(cmat[,1:colmax],col="white", key=NULL, axis.col=list(side=1, labels=FALSE, tick=FALSE), axis.row=list(side=2, labels=FALSE, tick=FALSE), ylab="", xlab="", main=NA, polygon.cell=list(border=NA))
-#title(ylab="Individual",line=0.5,cex.lab=1.2)
-title(xlab="Ranked pairwise relatedness",line=0.5,cex.lab=1.2)
-
-# add intensity mask to submatrix
-tracecol1 = "blue"
-tracecol2 = "red"
-tracecol3 = "black"
-colscale <- 7
-yt=nrow(cval)+1.5
-for (i in 1:nrow(cval)) {
-	yt = yt-1
-	yb = yt-1
-	xl=-0.5
-	cutoff1 = 0
-	cutoff2 = 0
-	cutoff3 = 0
-	for (j in 2:colmax) {
-		xl = xl+1
-		xr = xl+1
-		rect(xleft=xl, xright=xr, ybottom=yb, ytop=yt, border=alpha("gray80",0.3), col=alpha(colmat[i,j],colscale*cval[i,j]))
-		# plot demarcation lines
-		if (!cutoff1 && j < ncol(cval) && cval[i,j+1] < min.relate) {
-			lines(x=c(xr,xr), y=c(yb,yt), col=tracecol1, lty=2,lwd=2)
-			if (i > 1) lines(x=c(xr, x.prev1),y=c(y.prev1,y.prev1), col=tracecol1, lty=2, lwd=2)
-			x.prev1 = xr
-			y.prev1 = yb
-			cutoff1 = 1
-		}
-		if (!cutoff2 && j < ncol(cval) && cval[i,j+1] < 0.01) {
-			lines(x=c(xr,xr+adj), y=c(yb,yt), col=tracecol2, lty=2,lwd=2)
-			if (i > 1) lines(x=c(xr, x.prev2),y=c(y.prev2,y.prev2), col=tracecol2, lty=2, lwd=2)
-			x.prev2 = xr
-			y.prev2 = yb
-			cutoff2 = 1
-		}
-		if (!cutoff3 && j < ncol(cval) && cval[i,j+1] < 0.0243058) {
-			lines(x=c(xr,xr), y=c(yb,yt), col=tracecol3, lty=2, lwd=2)
-			if (i > 1) lines(x=c(xr, x.prev3),y=c(y.prev3,y.prev3), col=tracecol3, lty=2, lwd=2)
-			x.prev3 = xr
-			y.prev3 = yb
-			cutoff3 = 1
-		}
-		
-		# plot individual labels
-		text(x=(xl+xr)/2,y=(yb+yt)/2,labels=ncnames[i,j],col="gray50",cex=0.7,srt=-90)
-	}
-}
-
-text(x=-0.5, y=(nrow(cval)):1, labels=cnames, xpd=TRUE)
-
-dev.off()
-
-# color intensity key for Contemporary only
-cmax <- round(cmax+0.05,digits=1)
-gradmat.c <- matrix(seq(from=0, to=cmax, by=0.01),nrow=1)
-gradmat.c.col <- matrix(rep("black",ncol(gradmat.c)),nrow=1)
-
-x11(width=17,height=4)
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/contemporary_ranked_matrix_color_scale.pdf',width=17,height=4)
-
-plot(gradmat.c,col="white", key=NULL, axis.col=list(side=1, labels=FALSE, tick=FALSE), axis.row=list(side=2, labels=FALSE, tick=FALSE), ylab="", xlab="", main=NA, polygon.cell=list(border=NA))
-yt=nrow(gradmat.c)+1.5
-for (i in 1:nrow(gradmat.c)) {
-	yt = yt-1
-	yb = yt-1
-	xl=-0.5
-	for (j in 1:(ncol(gradmat.c)-1)) {
-		xl = xl+1
-		xr = xl+1
-		rect(xleft=xl, xright=xr, ybottom=yb, ytop=yt, border=alpha("gray80",0.3), col=alpha(gradmat.c.col[i,j],colscale*gradmat.c[i,j]))
-	}
-}
-
-axis(side=1,at=seq(from=0.5,to=ncol(gradmat.c),by=1),labels=sprintf("%.2f",gradmat.c[1,]), cex.axis=4, padj=0.8, xpd=TRUE, lwd.ticks=2, tck=-0.08)
-
-dev.off()
 
 ## Relatedness versus fledging sucess
 
@@ -4471,160 +3814,7 @@ legend(x=-0.5, y=0.50, substitute(paste("All ind., ", R^2," = ",rsq),list(rsq=ro
 text(x=x.intro, y=jitter(maxrho.df$r_skew_024,amount=0.03), maxrho.df$LAB_ID)
 
 
-
-## ROH
-
-The following procedure was carried out for running bcftools without --rec-rate (no recombination, results in 
-/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/allsamp_af/no_recomb) and with --rec-rate 1.3e-8 (constant recombination 
-rate of 1.3e-8 per site, results in /mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/allsamp_af/const_recomb)
-
-icer_workdir='/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/allsamp_af/train'
-
-$ for i in {1..87}; do SAMP=$(sed -n "${i}p" /mnt/research/Fitz_Lab/projects/mosaic/mosiac_ids.txt); grep "^VT" fsj_mosaic_biallelic_snps_main_autosomes_qc_${SAMP}.viterbi | tail -n 1 | cut -f2,7,9 >> fsj_mosaic_biallelic_snps_main_autosomes_qc_hmm_pars.txt; done
-$ printf "sample\tchromosome\tstart\tend\tlength_bp\tn_snps\tavg_quality\n" > fsj_mosaic_biallelic_snps_main_autosomes_qc.hmm.roh.regions
-$ for i in {1..87}; do SAMP=$(sed -n "${i}p" /mnt/research/Fitz_Lab/projects/mosaic/mosiac_ids.txt); grep "^RG" fsj_mosaic_biallelic_snps_main_autosomes_qc_${SAMP}.hmm.roh | cut -f2- >> fsj_mosaic_biallelic_snps_main_autosomes_qc.hmm.roh.regions; done
-
-R
-
-meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
-meta$grpcol <- pntcol(meta)
-
-# ROH calculations without recombination
-
-roh.n <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/fsj_mosaic_biallelic_snps_main_autosomes_qc_norecomb.hmm.roh.regions',head=TRUE) # no recombination rate roh
-roh.n <- roh.n[which(roh.n$avg_quality >= 20),]
-
-# calculate number of ROH > 1 mb
-rohc.count <- NULL
-for (id in unique(roh.n$sample)) { rohc.count <- rbind(rohc.count, data.frame(sample=id, n_roh = length(which(roh.n$length_bp[which(roh.n$sample == id)] > 10^6)))) }
-
-#plot
-
-png(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/plots/fsj_mosaic_biallelic_snps_main_autosomes_qc_norecomb.hmm.roh.dist.png', width=14,height=7,units='in',res=120)
-par(mar=c(5, 6, 4, 2)+1)
-plot(length_bp ~ sample, data=roh.n, las=2, xlab="", ylab="", col=meta$grpcol, outcol=meta$grpcol, xaxt="n")
-axis(1, at=1:nrow(rohc.count),labels=rohc.count$sample,las=2,cex.axis=0.8)
-title(ylab="ROH length (bp)", outer=FALSE, line=5)
-dev.off()
-
-png(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/plots/fsj_mosaic_biallelic_snps_main_autosomes_qc_norecomb.hmm.roh.count.png', width=14,height=7,units='in',res=120)
-barplot(rohc.count$n_roh,names.arg=rohc.count$sample,las=2,col=meta$grpcol, ylab="Number ROH longer than 10^6 bp",cex.names=0.8)
-dev.off()
-
-# roh calculation assuming constant recombination
-
-roh.c <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/fsj_mosaic_biallelic_snps_main_autosomes_qc_constrecomb.hmm.roh.regions',head=TRUE) # no recombination rate roh
-roh.c <- roh.c[which(roh.c$avg_quality >= 20),]
-
-# calculate number of ROH > 1 mb
-rohc.count <- NULL
-for (id in unique(roh.c$sample)) { rohc.count <- rbind(rohc.count, data.frame(sample=id, n_roh = length(which(roh.c$length_bp[which(roh.c$sample == id)] > 10^6)))) }
-
-#plot
-
-png(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/plots/fsj_mosaic_biallelic_snps_main_autosomes_qc_constcomb.hmm.roh.dist.png', width=14,height=7,units='in',res=120)
-par(mar=c(5, 6, 4, 2)+1)
-plot(length_bp ~ sample, data=roh.c, las=2, xlab="", ylab="", col=meta$grpcol, outcol=meta$grpcol, xaxt="n")
-axis(1, at=1:nrow(rohc.count),labels=rohc.count$sample,las=2,cex.axis=0.8)
-title(ylab="ROH length (bp)", outer=FALSE, line=5)
-dev.off()
-
-png(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/plots/fsj_mosaic_biallelic_snps_main_autosomes_qc_constrecomb.hmm.roh.count.png', width=14,height=7,units='in',res=120)
-barplot(rohc.count$n_roh,names.arg=rohc.count$sample,las=2,col=meta$grpcol, ylab="Number ROH longer than 10^6 bp",cex.names=0.8)
-dev.off()
-
-
-## PRIVATE VARIATION LOSS
-
-icer_workdir='/mnt/ufs18/rs-012/Fitz_Lab/projects/mosaic/variants/vcf/biallelic_snps/private_variants'
-
-# this command prints all sites for which alleles detected in the E population are not found in M4 or T
-$ bcftools query -f '%CHROM\t%POS[\t%GT]\n' ../fsj_mosaic_biallelic_snps_main_autosomes_qc.vcf.gz | perl -ne 'chomp($l = $_); @tok = split(/\t/,$l); $chr = shift @tok; $pos = shift @tok; $geno = join(/ /,@tok[28..38]); @alleles = (); push @alleles, 0 if $geno =~ /0/; push @alleles, 1 if $geno =~ /1/; $geno_comp = join(//,@tok[45..86]); $n = 0; foreach $a (@alleles) { $n++ if ($geno_comp !~ /$a/);}; print "$chr\t$pos\n" if ($n);' > historic_wellfield_private_variants.pos
-
-# this command prints all sites for which alleles detected in either M4 or T are not found in E
-$ bcftools query -f '%CHROM\t%POS[\t%GT]\n' ../fsj_mosaic_biallelic_snps_main_autosomes_qc.vcf.gz | perl -ne 'chomp($l = $_); @tok = split(/\t/,$l); $chr = shift @tok; $pos = shift @tok; $geno = join(/ /,@tok[45..86]); @alleles = (); push @alleles, 0 if $geno =~ /0/; push @alleles, 1 if $geno =~ /1/; $geno_comp = join(//,@tok[28..38]); $n = 0; foreach $a (@alleles) { $n++ if ($geno_comp !~ /$a/);}; print "$chr\t$pos\n" if ($n);' > historic_T_M4_private_variants.pos
-
-# this command prints all sites for which alleles detected in T are not round in E
-$ bcftools query -f '%CHROM\t%POS[\t%GT]\n' ../fsj_mosaic_biallelic_snps_main_autosomes_qc.vcf.gz | perl -ne 'chomp($l = $_); @tok = split(/\t/,$l); $chr = shift @tok; $pos = shift @tok; $geno = join(/ /,@tok[58..86]); @alleles = (); push @alleles, 0 if $geno =~ /0/; push @alleles, 1 if $geno =~ /1/; $geno_comp = join(//,@tok[28..38]); $n = 0; foreach $a (@alleles) { $n++ if ($geno_comp !~ /$a/);}; print "$chr\t$pos\n" if ($n);' > T_variants_not_in_E.pos
-
-# generate 2D-SFS between C and E at sites with historically private wellfield variants
-
-$ angsd -bam ../../map/mosaic_E_bam_list.txt -out historic_wellfield_private_variants_E -GL 1 -doSaf 1 -anc /mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ.V3.fa -minQ 20 -minMapQ 20 -sites ../../variants/vcf/biallelic_snps/private_variants/historic_wellfield_private_variants.pos -rf ../../variants/vcf/biallelic_snps/private_variants/historic_wellfield_private_variants.rf -P 12
-
-$ angsd -bam ../../map/mosaic_C_bam_list.txt -out historic_wellfield_private_variants_C -GL 1 -doSaf 1 -anc /mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ.V3.fa -minQ 20 -minMapQ 20 -sites ../../variants/vcf/biallelic_snps/private_variants/historic_wellfield_private_variants.pos -rf ../../variants/vcf/biallelic_snps/private_variants/historic_wellfield_private_variants.rf -P 12$ realSFS historic_wellfield_private_variants_E.saf.idx historic_wellfield_private_variants_C.saf.idx > historic_wellfield_private_variants_E_vs_C.2dsfs
-
-$ realSFS historic_wellfield_private_variants_E.saf.idx historic_wellfield_private_variants_C.saf.idx > historic_wellfield_private_variants_E_vs_C.2dsfs
-
-R
-sfs <- scan('/home/tyler/Dropbox/research/jay/mosaic/popgen/sfs/historic_wellfield_private_variants_E_vs_C.2dsfs')
-mat <- matrix(sfs, nrow=2*11+1, ncol=2*28+1)
-
-## spatial analysis of relatedness
-
-R
-
-library(stringr)
-gps <- read.csv('/home/tyler/Dropbox/research/jay/mosaic/sampling_map/mosaic_samples_gps.csv')
-rank_names <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_ranked.txt', head=FALSE)
-gps.well <- gps[1:39,]
-merge_name <- paste(gps.well$LAB_ID, gps.well$site,sep="_")
-gps.well$source_ind <- NA
-gps.well$source_site <- NA
-
-for (i in 1:nrow(gps.well)) {
-	rank_idx <- which(rank_names[,1] == merge_name[i])
-	for (j in 2:ncol(rank_names)) {
-		if ((i <= 28 && length(grep("^[^C]", rank_names[rank_idx,j])) > 0) || (i > 28 && length(grep("^[^EC]", rank_names[rank_idx,j])) > 0)) {
-			relvec = str_split(rank_names[rank_idx,j],"_")[[1]]
-			gps.well$source_ind[i] <- paste0(relvec[1], "_", relvec[2])
-			gps.well$source_site[i] <- paste(relvec[3:length(relvec)],collapse="_")
-			break
-		}
-	}
-}
-
-#write.csv(gps.well,file='~/Dropbox/research/jay/mosaic/sampling_map/mosaic_wellfield_samples_gps.csv',quote=FALSE,row.names=FALSE)
-
-# make gps file for plotting colors on map based on contemporary Wellfeild PCA orientation
-
-gps.c.well <- gps.well[1:28,]
-c.covar <- as.matrix(read.table('~/Dropbox/research/jay/mosaic/popgen/pca/fsj_mosaic_biallelic_snps_main_autosomes_qc_C_minmaf2perc.covar',head=FALSE))
-c.eig <- eigen(c.covar)
-
-gps.c.well$PC1 <- c.eig$vectors[,1]
-gps.c.well$PC2 <- c.eig$vectors[,2]
-gps.c.well$PC3 <- c.eig$vectors[,3]
-gps.c.well$PC4 <- c.eig$vectors[,4]
-gps.c.well$PC5 <- c.eig$vectors[,5]
-gps.c.well$PC6 <- c.eig$vectors[,6]
-gps.c.well$PC7 <- c.eig$vectors[,7]
-gps.c.well$PC8 <- c.eig$vectors[,8]
-gps.c.well$PC9 <- c.eig$vectors[,9]
-gps.c.well$PC10 <- c.eig$vectors[,10]
-
-#write.csv(gps.c.well,file='~/Dropbox/research/jay/mosaic/sampling_map/mosaic_C_wellfield_samples_gps.csv',quote=FALSE,row.names=FALSE)
-
-## Novogene Quality Assessment
-report <- read.csv('/home/tyler/Dropbox/research/jay/mosaic/raw_data/report/X202SC21114224-Z01-F003_final_20220407122035/src/tables/qc_summary_for_R.csv',head=TRUE,sep="\t")
-
-# calculate number of clean reads per sample
-df <- NULL
-
-for (id in unique(report$Sample)) { 
-   df.tmp <- report[which(report$Sample == id),]
-   nreads <- sum(df.tmp$Raw_reads * df.tmp$Effective_percent)
-   df <- rbind(df,data.frame(Sample = df.tmp$Sample[1], clean_reads = nreads))
-}
-
-min(df$clean_reads)
-#[1] 7760778142
-
-max(df$clean_reads)
-# [1] 14886796518
-
-median(df$clean_reads)
-# [1] 8399727872
-
+------------- TL TODO
 
 ### SKEW ANALYSIS
 
@@ -4839,7 +4029,7 @@ $ ~/code_projects/PopGenomicsTools/relateStats --pedstat 1 --ped cr_ped_20230512
 
 workdir='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness'
 
-Skew analaysis involving all sequenced individuals
+Skew analaysis involving all sequenced individuals setting the --background_r to the 95th quantile for relatedness between resident CR and translocated individuals (0.0243058).
 
 $ ~/code_projects/PopGenomicsTools/relateStats --skewstat 1 --rmat fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix_relateStats_input.txt --anc MW_founders_list.txt --cohort MW_contemporary_list.txt --background_r 0.0243058 --out ./skew/T_E_I_M4_to_contemporary_contributions_c0.0243058
 
