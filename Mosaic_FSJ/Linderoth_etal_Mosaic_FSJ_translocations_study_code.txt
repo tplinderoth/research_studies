@@ -870,21 +870,69 @@ eval $CMD
 
 --- end bash code ---
 
-Format ngsRelate output into a two dimensional r matrix - TL TODO
+Format ngsRelate output into a two dimensional r matrix.
 
-## Subset individuals such that all pairwise relatedness within each group is <= 0.4, which should exclude any first degree relatives.
-## These subsets are maximally large, while ensuring that r <= 0.4.
-## These are the subsets used for estimating average heterozygosity and estimating allele frequencies for inbreeding inferences.
+--- start R code ---
 
-Groups (Unrelated := r < 0.4) and subset sample sizes:
--Unrelated Contemporary CR group (n = 28)
--Unrelated Resident CR group (n = 14)
--Site 13 group (n = 10)
--Unrelated Historic metapopulation group (n = 39)
--Unrelated CR founders (Resident + translocated, n = 29)
--donor sites (includes translocated individuals) (n = 16)
+df <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness.txt',head=TRUE)
+meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
+meta$pop.names <- popnames(meta)
 
-Extract relatedness submatrices that include only the individuals within each group
+# convert pairwise comparisons into a matrix
+n = 87
+rmat <- matrix(ncol=n, nrow=n)
+
+for (i in 1:n) {
+	iidx = i-1
+	for (j in 1:n) {
+		jidx = j-1
+		if (i == j) {
+			rmat[i,j] = NA
+		} else if (!is.na(rmat[j,i])) {
+			rmat[i,j] = rmat[j,i]
+			#if (j < i) rmat[i,j] = NA # this makes half matrix
+		} else {
+			rmat[i,j] = df$rab[which(df$a == iidx & df$b == jidx)]
+		}
+	}
+}
+
+# output matrix
+#write.table(rmat,file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/#fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix.nonames.txt',col.names=FALSE,row.names=FALSE,quote=FALSE,sep="\t
+
+colnames(rmat) <- paste0(meta$LAB_ID,":",gsub(" ", "_", meta$pop.names))
+rownames(rmat) <- paste0(meta$LAB_ID,":",gsub(" ", "_", meta$pop.names))
+#write.table(rmat,file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix.txt',col.names=TRUE,row.names=TRUE,quote=FALSE,sep="\t")
+
+--- end R code ----
+
+## Relatedness distribution summaries
+
+--- start R code ----
+
+dat <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_ranked_usfws_pretty2.txt',head=FALSE)
+# Each column in fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_ranked_usfws_pretty2.txt is a focal individual, row 1 is focal individual information in the format
+# <Fitz LAB ID>,<USFWS ID>,<population ID>, while rows 2..87 are other individuals in format <Fitz LAB ID>,<USFWS ID>,<population ID>,<relatedness to focal individual>.
+
+# average pairwise relatedness between translocated individuals and Residents
+r.rt = NULL # stores the pairwise relatedness between Residents and translocated individuals
+transpop <- c("SITE_1", "SITE_12", "SITE_13", "SITE_18", "TEXACO")
+for (i in 1:ncol(dat)) {
+	tok = strsplit(dat[1,i],",")[[1]]
+	if (tok[3] != "Resident") next
+	for (j in 2:nrow(dat)) {
+		tok = strsplit(dat[j,i],",")[[1]]
+		if (tok[3] %in% transpop || tok[1] == "I_049") r.rt <- c(r.rt, as.numeric(tok[4]))
+	}
+}
+
+quantile(r.rt, 0.95)
+#      95% 
+#0.0243058 # 95th quantile for pairwise relatedness between resident and donor site individuals
+
+--- end R code ---
+
+Extract relatedness submatrices for different groups or populations.
 
 --- start R code ---
 
@@ -2756,1105 +2804,54 @@ text(x=eig$vectors[,1],y=eig$vectors[,2], labels = meta$COLOR_ID, col=meta$popco
 
 #dev.off()
 
+--- end R code ---
 
 
+## ---------- PEDIGREE SKEW ANALYSIS ---------- ##
 
+## Generate pedigree
 
+# Extract census data for only the core population (Mosaic Wellfield + Duette Preserve + Coker Tract) from metadata.
 
-## Relatedness versus fledging sucess
+--- begin R code for extracting core pop individuals ---
 
-df <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness.txt',head=TRUE)
-meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
-fledge <- read.table('~/Dropbox/research/jay/mosaic/monitoring_data/translocated_jay_fledging_success.txt',head=TRUE)
-rank_names <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_ranked.txt', head=FALSE)
-
-df$id_a <- NA
-df$fed_a <- NA
-df$type_a <- NA
-df$id_b <- NA
-df$fed_b <- NA
-df$type_b <- NA
-for (i in 1:nrow(df)) {
-	aidx <- df$a[i]+1
-	bidx <- df$b[i]+1
-	df$id_a[i] <- meta$LAB_ID[aidx]
-	df$fed_a[i] <- meta$USFWS_ID[aidx]
-	df$type_a[i] <- meta$type[aidx]
-	df$id_b[i] <- meta$LAB_ID[bidx]
-	df$fed_b[i] <- meta$USFWS_ID[bidx]
-	df$type_b[i] <- meta$type[bidx]
-}
-
-trans_id <- meta$LAB_ID[which(meta$type == "T")]
-df.summary <- NULL
-for (id in trans_id) {
-	subdf <- df[which((df$id_a == id | df$id_b == id) & (df$type_a == "C" | df$type_b == "C")),]
-	fedid <- meta$USFWS_ID[which(meta$LAB_ID == id)]
-	site <- meta$site[which(meta$LAB_ID == id)]
-	df.summary <- rbind(df.summary,data.frame(LAB_ID=id, USFWS_ID=fedid, site=site, avg_rab = mean(subdf$rab), median_rab = median(subdf$rab), var_rab = var(subdf$rab), min_rab = min(subdf$rab), max_rab = max(subdf$rab), n0.01 = length(which(subdf$rab > 0.01)), n0.05 = length(which(subdf$rab > 0.05)), n0.1 = length(which(subdf$rab > 0.1)), n0.5 = length(which(subdf$rab > 0.5))))
-}
-
-df.summary$fledge <- unname(sapply(df.summary$USFWS_ID,function(x,df){ifelse(x %in% df$FEDERAL_ID, df$total_fledged[which(df$FEDERAL_ID == x)], NA)}, df=fledge))
-
-merge_name <- paste(df.summary$LAB_ID,df.summary$site,sep="_")
-df.summary$toprelate <- 0
-for (i in 1:nrow(rank_names)) {
-	if (length(grep("^C", rank_names[i,1])) > 0) {
-		for (j in 2:ncol(rank_names)) {
-			if (length(grep("^[EI]", rank_names[i,j])) > 0) break else { # excluding individuals with high E/I individuals prevents confounding T ancestry through E/I ancestry
-				if (length(grep("^T", rank_names[i,j])) > 0) {
-					idx = which(merge_name == rank_names[i,j])
-					df.summary$toprelate[idx] = df.summary$toprelate[idx] + 1
-					break
-				}
-			}
-		}
-	}
-}
-
-# fit site-specific lines to the number of nearest genetic relatives against fledging success
-# note: site18 only has one sequenced individual so not fitting 
-# note: site12 has two sequenced individuals with no variation in either the response or explanatory variables, so not fitting
-# note: texaco shows no variation in response variable so not fitting
-
-site1.fit <- lm(toprelate ~ fledge, data=df.summary[which(df.summary$site == "SITE_1"),])
-site13.fit <- lm(toprelate ~ fledge, data=df.summary[which(df.summary$site == "SITE_13"),])
-
-#summary(site1.fit)
-#
-#Call:
-#lm(formula = toprelate ~ fledge, data = df.summary[which(df.summary$site == 
-#    "SITE_1"), ])
-#
-#Residuals:
-#       3        5       22       25 
-# 0.24880  0.07656  0.24880 -0.57416 
-#
-#Coefficients:
-#            Estimate Std. Error t value Pr(>|t|)   
-#(Intercept) -0.24880    0.28962  -0.859  0.48083   
-#fledge       0.41148    0.03828  10.750  0.00854 **
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-#
-#Residual standard error: 0.4792 on 2 degrees of freedom
-#  (1 observation deleted due to missingness)
-#Multiple R-squared:  0.983,	Adjusted R-squared:  0.9745 
-#F-statistic: 115.6 on 1 and 2 DF,  p-value: 0.008543
-
-#summary(site13.fit)
-#
-#Call:
-#lm(formula = toprelate ~ fledge, data = df.summary[which(df.summary$site == 
-#    "SITE_13"), ])
-#
-#Residuals:
-#    Min      1Q  Median      3Q     Max 
-#-0.8489 -0.3347 -0.3347  0.2980  1.6653 
-#
-#Coefficients:
-#            Estimate Std. Error t value Pr(>|t|)
-#(Intercept)  0.33473    0.21944   1.525    0.147
-#fledge       0.03673    0.03210   1.144    0.269
-#
-#Residual standard error: 0.7008 on 16 degrees of freedom
-#Multiple R-squared:  0.07561,	Adjusted R-squared:  0.01784 
-#F-statistic: 1.309 on 1 and 16 DF,  p-value: 0.2694
-
-# plot
-library(scales)
-
-df.summary$site.col <- replace(df.summary$site, which(df.summary$site == "SITE_1"), "limegreen")
-df.summary$site.col <- replace(df.summary$site.col, which(df.summary$site.col == "SITE_13"), "gold2")
-df.summary$site.col <- replace(df.summary$site.col, which(df.summary$site.col == "SITE_12"), "maroon4")
-df.summary$site.col <- replace(df.summary$site.col, which(df.summary$site.col == "SITE_18"), "dodgerblue1")
-df.summary$site.col <- replace(df.summary$site.col, which(df.summary$site.col == "TEXACO"), "darkslategrey")
-
-#df.summary$site.col[which(df.summary$LAB_ID == "T_086")] = "red"
-#df.summary$site.col[which(df.summary$LAB_ID == "T_083")] = "red"
-#df.summary$site.col[which(df.summary$LAB_ID == "T_084")] = "red"
-#df.summary$site.col[which(df.summary$LAB_ID == "T_079")] = "red"
-#df.summary$site.col[which(df.summary$LAB_ID == "T_081")] = "red"
-#df.summary$site.col[which(df.summary$LAB_ID == "T_100")] = "red"
-
-#df.summary$site.col[which(df.summary$LAB_ID == "T_082")] = "cyan"
-#df.summary$site.col[which(df.summary$LAB_ID == "T_096")] = "cyan"
-#df.summary$site.col[which(df.summary$LAB_ID == "T_067")] = "cyan"
-#df.summary$site.col[which(df.summary$LAB_ID == "T_078")] = "cyan"
-#df.summary$site.col[which(df.summary$LAB_ID == "T_080")] = "cyan"
-#df.summary$site.col[which(df.summary$LAB_ID == "T_077")] = "cyan"
-#df.summary$site.col[which(df.summary$LAB_ID == "T_074")] = "cyan"
-#df.summary$site.col[which(df.summary$LAB_ID == "T_070")] = "cyan"
-
-nsite1 = length(which(df.summary$site == "SITE_1"))
-nsite12 = length(which(df.summary$site == "SITE_12"))
-nsite13 = length(which(df.summary$site == "SITE_13"))
-nsite18 = length(which(df.summary$site == "SITE_18"))
-ntex = length(which(df.summary$site == "TEXACO"))
-
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/fsj_nearest_genetic_relatives_vs_fledging_2.pdf')
-pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/fsj_nearest_genetic_relatives_vs_fledging_2_print.pdf')
-par(mar=c(4.8,4.2,3.8,2)+0.1)
-set.seed(10284)
-plot(jitter(df.summary$toprelate,amount=0.03) ~ jitter(df.summary$fledge,amount=0.8), col=df.summary$site.col, cex=2, ylab="Number genetically nearest C Wellfield relatives", 
-xlab="Total fledged offspring following translocation", cex.axis=1.5, cex.lab = 1.5, type="n")
-
-abline(coefficients(site1.fit)[1], coefficients(site1.fit)[2], col=alpha("limegreen",0.2), lwd=2.3)
-abline(coefficients(site13.fit)[1], coefficients(site13.fit)[2], col=alpha("gold2",0.5), lwd=2.3)
-abline(h=0, col=alpha("darkslategrey",0.2), lwd=2.3)
-
-set.seed(10284)
-points(jitter(df.summary$toprelate,amount=0.03) ~ jitter(df.summary$fledge,amount=0.8), col=alpha(df.summary$site.col,0.8), cex=2, pch=19)
-set.seed(10284)
-#points(jitter(df.summary$toprelate,amount=0.03) ~ jitter(df.summary$fledge,amount=0.8), col=df.summary$site.col, cex=2, pch=1)
-points(jitter(df.summary$toprelate,amount=0.03) ~ jitter(df.summary$fledge,amount=0.8), col="gray10", cex=2, pch=1, lwd=1)
-
-legend('topleft', c(paste0("site 1 (","n = ", nsite1,")"), paste0("site 12 (","n = ",nsite12,")"), paste0("site 13 (","n = ",nsite13,")"), paste0("site 18 (","n = ",nsite18, ")"), paste0("Texaco (","n = ", ntex, ")")), fill=c("limegreen", "maroon4", "gold2", "dodgerblue1", "darkslategrey"), bty='n', cex=1.2)
-dev.off()
-
-## Relatedness proportion plot
-
-meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
-meta$popcol <- popcolor(meta)
-
-dat <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_ranked_usfws_pretty2.txt',head=FALSE)
-
-relate.counts <- NULL
-rmin <- sort(c(0.00390625, 0.004222888, 0.01, 0.0243058))
-ids <- NULL
-for (i in 1:ncol(dat)) {
-	tok = strsplit(dat[1,i],",")[[1]]
-	if (tok[3] != "Contemporary") {
-		ids <- c(ids, tok[1])
-		counts <- rep(0, length(rmin))
-		for (j in 2:nrow(dat)) {
-			tok2 = strsplit(dat[j,i],",")[[1]]
-			if (tok2[3] == "Contemporary") {
-				for (k in 1:length(rmin)) {
-					if (as.numeric(tok2[4]) >= rmin[k]) counts[k] = counts[k] + 1				
-				}
-			}
-		}
-		relate.counts <- rbind(relate.counts, matrix(counts, nrow=1))
-	}
-}
-
-# add pop info for sorting
-rownames(relate.counts) <- ids
-colnames(relate.counts) <- as.character(sprintf("%.4f",round(rmin,4)))
-relate.percent <- (relate.counts/(ncol(dat)-length(ids))) * 100
-
-relate.df <- cbind(data.frame(ID = rownames(relate.percent), pop = sapply(rownames(relate.percent), function(x,df){df$pop[which(df$LAB_ID == x)]}, USE.NAMES=FALSE, df=meta), idx=1:(nrow(relate.percent))), data.frame(relate.percent))
-relate.df$col <- sapply(relate.df$ID, function(x,df){df$popcol[which(df$LAB_ID == x)]}, USE.NAMES=FALSE, df=meta)
-relate.df$pop_name <- popnames(relate.df)
-
-# format for plotting
-pop.idx.sort <- relate.df$idx[c(which(relate.df$pop == "Resident"), which(relate.df$pop == "SITE_1"), which(relate.df$pop == "SITE_12"), which(relate.df$pop == "SITE_13"), which(relate.df$pop == "SITE_18"), which(relate.df$pop == "TEXACO"), which(relate.df$pop == "Brigman"), which(relate.df$pop == "Duette_headwaters"), which(relate.df$pop == "Golden_Aster_Scrub"), which(relate.df$pop == "Sun_City"), which(relate.df$pop == "W.Balm"))]
-
-relate.percent.sort <- relate.percent[pop.idx.sort,] # order by population
-
-# plot
-
-#x11(width=16, height=7)
-pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/percent_relatives.pdf',width=16,height=7)
-par(mar=c(5,4.5,4,2)+0.1)
-relate.bar <- barplot(height=t(relate.percent.sort[,4:2]), beside=TRUE, axisnames=FALSE, col=c("lightpink2", "aquamarine2", "steelblue"), cex.axis=1.4, ylab="Percent Contemporary individuals", cex.lab=1.4, ylim=c(0,50))
-text(x=colMeans(relate.bar), y=-3.5, labels=rownames(relate.percent.sort), xpd=TRUE, srt=90)
-legend(x=215, y=50,legend=as.character(sprintf("%.4f",round(rmin,4)))[4:2], fill=c("lightpink2", "aquamarine2", "steelblue"), bty='n', cex=1.4, text.col="grey20", title="r cutoff")
-dev.off()
-
-## Distribution of number of related Contemporary individuals
-
-s <- read.table("/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/skew_stat_024.txt",head=TRUE)
-pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/number_related_Contemporary_r024.pdf')
-par(mar=c(5, 4.5, 4, 2)+0.1)
-hist(s$n.relate,breaks=10,xlab="Number related Contemporary Individuals", ylab="Frequency", cex.axis=1.4, cex.lab=1.4, main="")
-text(x=6,y=25,labels="r > 0.024", cex=1.4, xpd=TRUE)
-dev.off()
-
-## Skewed relatedness analysis
-
-meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
-meta$popcol <- popcolor(meta)
-
-dat <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_ranked_usfws_pretty2.txt',head=FALSE)
-
-c.idx = NULL
-for (i in 1:ncol(dat)) {
-	if (strsplit(dat[1,i],",")[[1]][3] == "Contemporary") c.idx <- c(c.idx, i)
-}
-nc = length(c.idx)
-
-# average background pairwise relatedness among residents
-rc = NULL
-for (i in c.idx) {
-	ind1 = strsplit(dat[1,i],",")[[1]][1]
-	for (k in 2:nrow(dat)) {
-		tok = strsplit(dat[k,i],",")[[1]]
-		ind2 = tok[1]
-		if (tok[3] == "Contemporary" && (length(which(rc$ind1 == ind1)) < 1 || length(which(rc$ind1 == ind2)) < 1)) {
-			rc <- rbind(rc, data.frame(ind1 = ind1, ind2 = ind2, r = as.numeric(tok[4])))
-		}
-	}
-}
-
-avg.rc = mean(rc$r)
-
-# average pairwise relatedness between translocated individuals and Residents
-r.rt = NULL # stores the pairwise relatedness between Residents and translocated individuals
-transpop <- c("SITE_1", "SITE_12", "SITE_13", "SITE_18", "TEXACO")
-for (i in 1:ncol(dat)) {
-	tok = strsplit(dat[1,i],",")[[1]]
-	if (tok[3] != "Resident") next
-	for (j in 2:nrow(dat)) {
-		tok = strsplit(dat[j,i],",")[[1]]
-		if (tok[3] %in% transpop || tok[1] == "I_049") r.rt <- c(r.rt, as.numeric(tok[4]))
-	}
-}
-
-calc_r_stats <- function(df, r.cutoff = 0.001) {
-
-# Statistic: X_{i,c}
-#
-# X_{i,c}: Joint probability that non-Contemporary individual i will be related to a Contemporary individual j 
-# (based on r_{i,j} > c) and that the relatedness of i to j is higher than that of any other contemporary individual 
-# to j.
-#
-# X_{i,c} = a_{i,c} * b_{i,c}
-# a_i = P(r_{i,j} > r_{k,j} | r_{i,j} > c) where j is a random Contemporary individual and k is a random non-Contemporary individual, k != i
-# b_i = P(r_{i,j} > c) where j is a random Contemporary individual
-#
-#
-# In other words, X_{i,c} is the average normalized relatedness ranking of individual i among their Contemporary relatives, 
-# weighted by the proportion of the Contemporary individuals that are related to i.
-
-	# initialize list
-	indvec = NULL
-	x = list()
-	n = 1
-	for (i in 1:ncol(df)) {
-		tok = strsplit(df[1,i],",")[[1]]
-		if (tok[3] == "Contemporary") next
-		indvec <- c(indvec, tok[1])
-		x[[n]] <- list(name = tok[1], rank = NULL, ncutoff = 0, relative.ID = NULL)
-		n = n+1
-	}
-
-	# record ranks and counts
-	for (j in 1:ncol(df)) {
-		tok = strsplit(df[1,j],",")[[1]]
-		if (tok[3] != "Contemporary") next
-		r.rank = 0
-		cind = tok[1]
-		for (k in 2:nrow(df)) {
-			tok = strsplit(df[k,j],",")[[1]]
-			if (tok[3] != "Contemporary") {
-				idx = which(indvec == tok[1])
-				r.rank = r.rank + 1
-				if (as.numeric(tok[4]) >= r.cutoff) {
-					# This contemporary individual is considered a relative
-					x[[idx]]$ncutoff = x[[idx]]$ncutoff + 1
-					x[[idx]]$rank <- c(x[[idx]]$rank, r.rank)
-					x[[idx]]$relative.ID <- c(x[[idx]]$relative.ID, cind)
-				}
-			}
-		}
-	}
-
-	# calculate stats
-	stat.df = NULL
-	n.ind = length(indvec)
-	nc = ncol(df) - n.ind
-	for (i in 1:n.ind) {
-		id = x[[i]]$name
-		avg.rank = ifelse(is.null(x[[i]]$rank), 0, mean((n.ind-x[[i]]$rank)/(n.ind-1)))
-		p = x[[i]]$ncutoff/nc
-		rel = ifelse(is.null(x[[i]]$relative.ID), NA, paste(x[[i]]$relative.ID,collapse=","))
-		stat.df = rbind(stat.df, data.frame(ID = x[[i]]$name, avg.rank = avg.rank, n.relate = x[[i]]$ncutoff, r.skew = avg.rank*p, relatives=rel))
-	}
-
-	return(stat.df)
-}
-
-df.relate <- calc_r_stats(df = dat, r.cutoff = 0.00390625 ) # 2/512 = Half third cousin (see Hartl and Clark pg. 272), r = 2*F
-df.relate2 <- calc_r_stats(df = dat, r.cutoff = 0.01) # corresponds to approximatley half second cousins (r = 2/128)
-df.relate3 <- calc_r_stats(df = dat, r.cutoff = mean(r.rt)) # 0.004222888: mean pairwise relatedness between Residents and translocated
-df.relate4 <- calc_r_stats(df = dat, r.cutoff = unname(quantile(r.rt, 0.95))) # 0.0243058: top 5% pairwise relatedness between Residents and translocated
-
-# output skew stat dataframes
-#write.table(df.relate,file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/skew_stat_0039.txt',col.names=TRUE,row.names=FALSE,quote=FALSE,sep="\t")
-#write.table(df.relate2,file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/skew_stat_01.txt',col.names=TRUE,row.names=FALSE,quote=FALSE,sep="\t")
-#write.table(df.relate3,file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/skew_stat_0042.txt',col.names=TRUE,row.names=FALSE,quote=FALSE,sep="\t")
-#write.table(df.relate4,file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/skew_stat_024.txt',col.names=TRUE,row.names=FALSE,quote=FALSE,sep="\t")
-
-# plot genetic skew statistic
-library(scales)
-
-# relatedness cutoff of 0.00390625
-df.relate.sort <- df.relate[order(-df.relate$r.skew),c(1,4)]
-
-pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/genetic_skew_004.pdf',width=13,height=7)
-
-par(mar=c(5,5.2,4,2)+0.1)
-plot(x=1:nrow(df.relate.sort), y=df.relate.sort$r.skew, type="l", lwd=4, col="grey60", ylab = expression(paste("Genetic skew (",hat(rho)[0.0039],")")), xlab="", xaxt='n',cex.lab=1.6, cex.axis=1.4)
-axis(1, at=1:nrow(df.relate.sort), labels=df.relate.sort$ID,cex=1.2,las=2)
-pointcols = meta$popcol[sapply(df.relate.sort$ID,function(x,df){which(df$LAB_ID == x)},df=meta, USE.NAMES=FALSE)]
-points(x=1:nrow(df.relate.sort), y=df.relate.sort$r.skew, pch=19, col=alpha(pointcols,0.8), cex=2)
-points(x=1:nrow(df.relate.sort), y=df.relate.sort$r.skew, pch=1, col=pointcols, cex=2, lwd=2)
-lh = df.relate.sort$r.skew-0.008
-lh[which(lh < 0.008)] = 0
-lines(x=1:nrow(df.relate.sort), y=lh, type="h", lwd=14, col=alpha(pointcols,0.4))
-
-dev.off()
-
-# relatedness cutoff of 0.01
-df.relate.sort2 <- df.relate2[order(-df.relate2$r.skew),c(1,4)]
-
-pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/genetic_skew_01.pdf',width=13,height=7)
-
-par(mar=c(5,5.2,4,2)+0.1)
-plot(x=1:nrow(df.relate.sort2), y=df.relate.sort2$r.skew, type="l", lwd=4, col="grey60", ylab = expression(paste("Genetic skew (",hat(rho)[0.01],")")), xlab="", xaxt='n',cex.lab=1.6, cex.axis=1.4)
-axis(1, at=1:nrow(df.relate.sort2), labels=df.relate.sort2$ID,cex=1.2,las=2)
-pointcols = meta$popcol[sapply(df.relate.sort2$ID,function(x,df){which(df$LAB_ID == x)},df=meta, USE.NAMES=FALSE)]
-points(x=1:nrow(df.relate.sort2), y=df.relate.sort2$r.skew, pch=19, col=alpha(pointcols,0.8), cex=2)
-points(x=1:nrow(df.relate.sort2), y=df.relate.sort2$r.skew, pch=1, col=pointcols, cex=2, lwd=2)
-lh = df.relate.sort2$r.skew-0.008
-lh[which(lh < 0.008)] = 0
-lines(x=1:nrow(df.relate.sort2), y=lh, type="h", lwd=14, col=alpha(pointcols,0.4))
-
-dev.off()
-
-# relatedness cutoff of 0.004222888 (mean pairwise relatedness between Residents and translocated)
-df.relate.sort3 <- df.relate3[order(-df.relate3$r.skew),c(1,4)]
-
-pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/genetic_skew_0042.pdf',width=13,height=7)
-
-par(mar=c(5,5.2,4,2)+0.1)
-plot(x=1:nrow(df.relate.sort3), y=df.relate.sort3$r.skew, type="l", lwd=4, col="grey60", ylab = expression(paste("Genetic skew (",hat(rho)[0.0042],")")), xlab="", xaxt='n',cex.lab=1.6, cex.axis=1.4)
-axis(1, at=1:nrow(df.relate.sort3), labels=df.relate.sort3$ID,cex=1.2,las=2)
-pointcols = meta$popcol[sapply(df.relate.sort3$ID,function(x,df){which(df$LAB_ID == x)},df=meta, USE.NAMES=FALSE)]
-points(x=1:nrow(df.relate.sort3), y=df.relate.sort3$r.skew, pch=19, col=alpha(pointcols,0.8), cex=2)
-points(x=1:nrow(df.relate.sort3), y=df.relate.sort3$r.skew, pch=1, col=pointcols, cex=2, lwd=2)
-lh = df.relate.sort3$r.skew-0.008
-lh[which(lh < 0.008)] = 0
-lines(x=1:nrow(df.relate.sort3), y=lh, type="h", lwd=14, col=alpha(pointcols,0.4))
-
-dev.off()
-
-# relatedness cutoff of 0.0243058 (top 5% pairwise relatedness between Residents and translocated)
-df.relate.sort4 <- df.relate4[order(-df.relate4$r.skew),c(1,4)]
-
-pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/genetic_skew_024.pdf',width=13,height=7)
-
-par(mar=c(5,5.2,4,2)+0.1)
-plot(x=1:nrow(df.relate.sort4), y=df.relate.sort4$r.skew, type="l", lwd=4, col="grey60", ylab = expression(paste("Genetic skew (",hat(rho)[0.024],")")), xlab="", xaxt='n',cex.lab=1.6, cex.axis=1.4)
-axis(1, at=1:nrow(df.relate.sort4), labels=df.relate.sort4$ID,cex=1.2,las=2)
-pointcols = meta$popcol[sapply(df.relate.sort4$ID,function(x,df){which(df$LAB_ID == x)},df=meta, USE.NAMES=FALSE)]
-points(x=1:nrow(df.relate.sort4), y=df.relate.sort4$r.skew, pch=19, col=alpha(pointcols,0.8), cex=2)
-points(x=1:nrow(df.relate.sort4), y=df.relate.sort4$r.skew, pch=1, col=pointcols, cex=2, lwd=2)
-lh = df.relate.sort4$r.skew-0.008
-lh[which(lh < 0.008)] = 0
-lines(x=1:nrow(df.relate.sort4), y=lh, type="h", lwd=14, col=alpha(pointcols,0.4))
-
-dev.off()
-
-# Genetic skew against fledging
-
-fledge <- read.table('~/Dropbox/research/jay/mosaic/monitoring_data/translocated_jay_fledging_success.txt',head=TRUE)
-
-# Add fledging info to data frames of relatedness stats
-df.relate$USFWS_ID = sapply(df.relate$ID,function(x,df){df$USFWS_ID[which(df$LAB_ID == x)]},USE.NAMES=FALSE,df=meta)
-df.relate2$USFWS_ID = sapply(df.relate2$ID,function(x,df){df$USFWS_ID[which(df$LAB_ID == x)]},USE.NAMES=FALSE,df=meta)
-df.relate3$USFWS_ID = sapply(df.relate3$ID,function(x,df){df$USFWS_ID[which(df$LAB_ID == x)]},USE.NAMES=FALSE,df=meta)
-df.relate4$USFWS_ID = sapply(df.relate4$ID,function(x,df){df$USFWS_ID[which(df$LAB_ID == x)]},USE.NAMES=FALSE,df=meta)
-
-df.relate$fledge <- sapply(df.relate$USFWS_ID, function(x,df){if (x %in% df$FEDERAL_ID) return(df$total_fledged[which(df$FEDERAL_ID == x)]) else return (NA)}, USE.NAMES=FALSE, df=fledge)
-df.relate2$fledge <- sapply(df.relate2$USFWS_ID, function(x,df){if (x %in% df$FEDERAL_ID) return(df$total_fledged[which(df$FEDERAL_ID == x)]) else return (NA)}, USE.NAMES=FALSE, df=fledge)
-df.relate3$fledge <- sapply(df.relate3$USFWS_ID, function(x,df){if (x %in% df$FEDERAL_ID) return(df$total_fledged[which(df$FEDERAL_ID == x)]) else return (NA)}, USE.NAMES=FALSE, df=fledge)
-df.relate4$fledge <- sapply(df.relate4$USFWS_ID, function(x,df){if (x %in% df$FEDERAL_ID) return(df$total_fledged[which(df$FEDERAL_ID == x)]) else return (NA)}, USE.NAMES=FALSE, df=fledge)
-
-pntcol <- sapply(df.relate4$ID, function(x,df){df$popcol[which(df$LAB_ID == x)]}, USE.NAMES=FALSE, df=meta)
-
-# Data frame of individuals with highest skew statistic per closely related group (these are likely the highly successful reproduces 
-# in each group). This prevents points for individuals with high skew statistics through relatedness to a genetically highly successful individual 
-# from being plotted and obscurring the relationship between genetic skew and fledging success.
-# Choose individuals based on grouping from Ward minimum variance clustering of pairwise relatedness and the PCA groupings.
-
-site1.1 <- c("T_071", "T_090", "T_097") 
-site12.1 <- c("T_068","T_089")
-site13.1 <- c("T_079", "T_081", "T_083", "T_084", "T_086", "T_100") # Site 13 group 1
-site13.2 <- c("T_070", "T_074", "T_077", "T_078", "T_080") # Site 13 group 2
-site13.3 <- c("T_067", "T_082", "T_098", "I_049") # Site 13 group 3
-tex.1 <- c("T_073","T_075","T_101")
-
-groups <- list(site1.1, site12.1, site13.1, site13.2, site13.3, tex.1)
-group.ind <- NULL
-
-set.seed(4642)
-
-dfmax <- list(NULL, NULL, NULL, NULL)
-for (i in 1:length(groups)) {
-	subdf1 <- df.relate[which(df.relate$ID %in% groups[[i]]),]
-	#dfmax[[1]] <- rbind(dfmax[[1]], subdf1[which(subdf1$r.skew == max(subdf1$r.skew))[1],])
-	idx1 <- which(subdf1$r.skew == max(subdf1$r.skew))
-	dfmax[[1]] <- rbind(dfmax[[1]], subdf1[ifelse(length(idx1) > 1,sample(x=idx1,size=1) ,idx1),]) # randomly sample 1 individual when there are ties for highest skew
-
-	subdf2 <- df.relate2[which(df.relate2$ID %in% groups[[i]]),]
-	#dfmax[[2]] <- rbind(dfmax[[2]], subdf2[which(subdf2$r.skew == max(subdf2$r.skew))[1],])
-	idx2 <- which(subdf2$r.skew == max(subdf2$r.skew))
-	dfmax[[2]] <- rbind(dfmax[[2]], subdf2[ifelse(length(idx2) > 1,sample(x=idx2,size=1) ,idx2),])
-
-	subdf3 <- df.relate3[which(df.relate3$ID %in% groups[[i]]),]
-	#dfmax[[3]] <- rbind(dfmax[[3]], subdf3[which(subdf3$r.skew == max(subdf3$r.skew))[1],])
-	idx3 <- which(subdf3$r.skew == max(subdf3$r.skew))
-	dfmax[[3]] <- rbind(dfmax[[3]], subdf3[ifelse(length(idx3) > 1,sample(x=idx3,size=1) ,idx3),])
-
-	subdf4 <- df.relate4[which(df.relate4$ID %in% groups[[i]]),]
-	#dfmax[[4]] <- rbind(dfmax[[4]], subdf4[which(subdf4$r.skew == max(subdf4$r.skew))[1],])
-	idx4 <- which(subdf4$r.skew == max(subdf4$r.skew))
-	dfmax[[4]] <- rbind(dfmax[[4]], subdf4[ifelse(length(idx4) > 1,sample(x=idx4,size=1) ,idx4),])
-
-	group.ind <- c(group.ind, groups[[i]])
-}
-
-dfmax[[1]] <- rbind(dfmax[[1]], df.relate[which(df.relate$ID %in% group.ind == FALSE & !is.na(df.relate$fledge)),])
-dfmax[[2]] <- rbind(dfmax[[2]], df.relate2[which(df.relate2$ID %in% group.ind == FALSE & !is.na(df.relate2$fledge)),])
-dfmax[[3]] <- rbind(dfmax[[3]], df.relate3[which(df.relate3$ID %in% group.ind == FALSE & !is.na(df.relate3$fledge)),])
-dfmax[[4]] <- rbind(dfmax[[4]], df.relate4[which(df.relate4$ID %in% group.ind == FALSE & !is.na(df.relate4$fledge)),])
-
-for (i in 1:4) {
-	dfmax[[i]]$popcol <- sapply(dfmax[[i]]$ID,function(x,df){df$popcol[which(df$LAB_ID == x)]},USE.NAMES=FALSE, df=meta)
-}
-
-# plot
-pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/genetic_skew_vs_fledging3.pdf') # this version fixes a text typo
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/genetic_skew_vs_fledging2.pdf')
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/genetic_skew_vs_fledging.pdf')
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/genetic_skew_vs_fledging_labels.pdf')
-
-# relatedness cutoff of 0.00390625
-
-dfmax.c <- df.relate[which(df.relate$ID %in% dfmax[[1]]$ID == FALSE & !is.na(df.relate$fledge)),]
-dfmax.c$popcol <- sapply(dfmax.c$ID,function(x,df){df$popcol[which(df$LAB_ID == x)]},USE.NAMES=FALSE, df=meta)
-dfmax.comb <- rbind(dfmax[[1]], dfmax.c)
-
-fledge.fit <- lm(r.skew ~ fledge, data=dfmax[[1]])
-
-#summary(fledge.fit)
-
-#Call:
-#lm(formula = r.skew ~ fledge, data = dfmax[[1]])
-#
-#Residuals:
-#     Min       1Q   Median       3Q      Max 
-#-0.14726 -0.09418 -0.03703  0.10453  0.20258 
-#
-#Coefficients:
-#            Estimate Std. Error t value Pr(>|t|)  
-#(Intercept) 0.129561   0.050784   2.551   0.0288 *
-#fledge      0.012904   0.006415   2.012   0.0720 .
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-#
-#Residual standard error: 0.1265 on 10 degrees of freedom
-#Multiple R-squared:  0.2881,	Adjusted R-squared:  0.2169 
-#F-statistic: 4.046 on 1 and 10 DF,  p-value: 0.07199
-
-fledge.fit.all <- lm(r.skew~fledge, data=dfmax.comb)
-
-#summary(fledge.fit.all)
-
-#Call:
-#lm(formula = r.skew ~ fledge, data = dfmax.comb)
-#
-#Residuals:
-#     Min       1Q   Median       3Q      Max 
-#-0.18227 -0.08459 -0.02509  0.04393  0.28733 
-#
-#Coefficients:
-#            Estimate Std. Error t value Pr(>|t|)    
-#(Intercept) 0.146781   0.031685   4.633 8.87e-05 ***
-#fledge      0.006025   0.004620   1.304    0.204    
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-#
-#Residual standard error: 0.1258 on 26 degrees of freedom
-#Multiple R-squared:  0.06139,	Adjusted R-squared:  0.02529 
-#F-statistic: 1.701 on 1 and 26 DF,  p-value: 0.2036
-
-set.seed(2496)
-par(mar=c(5,5.2,4,2)+0.1)
-x1 = jitter(dfmax[[1]]$fledge,amount=0.1)
-plot(x=x1, y=dfmax[[1]]$r.skew, pch=19, cex=1.5, col=dfmax[[1]]$popcol, ylab=expression(paste("Genetic skew (",hat(rho)[0.0039],")")), xlab="Total fledged offspring", xlim=c(0,17), cex.lab=1.6, cex.axis=1.4, ylim=c(0,0.48),type="n")
-abline(coefficients(fledge.fit)[1], coefficients(fledge.fit)[2], col="grey60", lwd=2.3)
-abline(coefficients(fledge.fit.all)[1], coefficients(fledge.fit.all)[2], col="grey60", lwd=3.3, lty=3)
-points(x=jitter(dfmax.c$fledge,amount=0.1), y=dfmax.c$r.skew, pch=1, col=dfmax.c$popcol, cex=2, lwd=3)
-points(x=x1, y=dfmax[[1]]$r.skew, pch=19, col=alpha(dfmax[[1]]$popcol,0.8), cex=2)
-points(x=x1, y=dfmax[[1]]$r.skew, pch=1, col=dfmax[[1]]$popcol, cex=2, lwd=3)
-text(x=13,y=0.33,substitute(paste(R^2," = ",rsq),list(rsq=round(summary(fledge.fit)$r.squared,digits=2))),cex=1.2,col="grey20")
-text(x=14,y=0.26,substitute(paste(R^2," = ",rsq),list(rsq=round(summary(fledge.fit.all)$r.squared,digits=2))),cex=1.2,col="grey20")
-#text(x=x1, y=jitter(dfmax[[1]]$r.skew,amount=0.01), dfmax[[1]]$ID)
-
-# relatedness cutoff of 0.01
-
-dfmax2.c <- df.relate2[which(df.relate2$ID %in% dfmax[[2]]$ID == FALSE & !is.na(df.relate2$fledge)),]
-dfmax2.c$popcol <- sapply(dfmax2.c$ID,function(x,df){df$popcol[which(df$LAB_ID == x)]},USE.NAMES=FALSE, df=meta)
-dfmax2.comb <- rbind(dfmax[[2]], dfmax2.c)
-
-fledge.fit2 <- lm(r.skew ~ fledge, data=dfmax[[2]])
-
-#summary(fledge.fit2)
-
-#Call:
-#lm(formula = r.skew ~ fledge, data = dfmax[[2]])
-#
-#Residuals:
-#      Min        1Q    Median        3Q       Max 
-#-0.216479 -0.083743 -0.008584  0.074247  0.159572 
-#
-#Coefficients:
-#            Estimate Std. Error t value Pr(>|t|)  
-#(Intercept) 0.116178   0.046762   2.484   0.0323 *
-#fledge      0.011917   0.005891   2.023   0.0706 .
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-#
-#Residual standard error: 0.123 on 10 degrees of freedom
-#Multiple R-squared:  0.2904,	Adjusted R-squared:  0.2194 
-#F-statistic: 4.092 on 1 and 10 DF,  p-value: 0.07065
-
-
-fledge.fit2.all <- lm(r.skew ~ fledge, data=dfmax2.comb)
-
-#summary(fledge.fit2.all)
-
-#Call:
-#lm(formula = r.skew ~ fledge, data = dfmax2.comb)
-#
-#Residuals:
-#     Min       1Q   Median       3Q      Max 
-#-0.15852 -0.09406 -0.02450  0.04758  0.27845 
-#
-#Coefficients:
-#            Estimate Std. Error t value Pr(>|t|)    
-#(Intercept) 0.124259   0.031930   3.892  0.00062 ***
-#fledge      0.005710   0.004656   1.226  0.23101    
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-#
-#Residual standard error: 0.1267 on 26 degrees of freedom
-#Multiple R-squared:  0.05469,	Adjusted R-squared:  0.01833 
-#F-statistic: 1.504 on 1 and 26 DF,  p-value: 0.231
-
-set.seed(2496)
-par(mar=c(5,5.2,4,2)+0.1)
-x2 = jitter(dfmax[[2]]$fledge,amount=0.1)
-plot(x=x2, y=dfmax[[2]]$r.skew, pch=19, cex=1.5, col=dfmax[[2]]$popcol, ylab=expression(paste("Genetic skew (",hat(rho)[0.01],")")), xlab="Total fledged offspring", xlim=c(0,17), cex.lab=1.6, cex.axis=1.4, ylim=c(0,0.48),type="n")
-abline(coefficients(fledge.fit2)[1], coefficients(fledge.fit2)[2], col="grey60", lwd=2.3)
-abline(coefficients(fledge.fit2.all)[1], coefficients(fledge.fit2.all)[2], col="grey60", lwd=3.3, lty=3)
-points(x=jitter(dfmax2.c$fledge,amount=0.1), y=dfmax2.c$r.skew, pch=1, col=dfmax2.c$popcol, cex=2, lwd=3)
-points(x=x2, y=dfmax[[2]]$r.skew, pch=19, col=alpha(dfmax[[2]]$popcol,0.8), cex=2)
-points(x=x2, y=dfmax[[2]]$r.skew, pch=1, col=dfmax[[2]]$popcol, cex=2, lwd=3)
-text(x=13,y=0.30,substitute(paste(R^2," = ",rsq),list(rsq=round(summary(fledge.fit2)$r.squared,digits=2))),cex=1.2,col="grey20")
-text(x=14,y=0.18,substitute(paste(R^2," = ",rsq),list(rsq=round(summary(fledge.fit2.all)$r.squared,digits=2))),cex=1.2,col="grey20")
-#text(x=x2, y=jitter(dfmax[[2]]$r.skew,amount=0.01), dfmax[[2]]$ID)
-
-# relatedness cutoff of 0.004222888 (mean pairwise relatedness between Residents and translocated)
-
-dfmax3.c <- df.relate3[which(df.relate3$ID %in% dfmax[[3]]$ID == FALSE & !is.na(df.relate3$fledge)),]
-dfmax3.c$popcol <- sapply(dfmax3.c$ID,function(x,df){df$popcol[which(df$LAB_ID == x)]},USE.NAMES=FALSE, df=meta)
-dfmax3.comb <- rbind(dfmax[[3]], dfmax3.c)
-
-fledge.fit3 <- lm(r.skew ~ fledge, data=dfmax[[3]])
-
-#summary(fledge.fit3)
-
-#Call:
-#lm(formula = r.skew ~ fledge, data = dfmax[[3]])
-#
-#Residuals:
-#     Min       1Q   Median       3Q      Max 
-#-0.13423 -0.09960 -0.03879  0.10514  0.19766 
-#
-#Coefficients:
-#            Estimate Std. Error t value Pr(>|t|)  
-#(Intercept) 0.124995   0.048949   2.554   0.0287 *
-#fledge      0.013958   0.006297   2.216   0.0510 .
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-#
-#Residual standard error: 0.125 on 10 degrees of freedom
-#Multiple R-squared:  0.3294,	Adjusted R-squared:  0.2624 
-#F-statistic: 4.913 on 1 and 10 DF,  p-value: 0.051
-
-fledge.fit3.all <- lm(r.skew ~ fledge, data=dfmax3.comb)
-
-#summary(fledge.fit3.all)
-
-#Call:
-#lm(formula = r.skew ~ fledge, data = dfmax3.comb)
-#
-#Residuals:
-#     Min       1Q   Median       3Q      Max 
-#-0.17949 -0.08306 -0.02271  0.03609  0.28886 
-#
-#Coefficients:
-#            Estimate Std. Error t value Pr(>|t|)    
-#(Intercept) 0.145249   0.031947   4.547 0.000111 ***
-#fledge      0.005912   0.004658   1.269 0.215654    
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-#
-#Residual standard error: 0.1268 on 26 degrees of freedom
-#Multiple R-squared:  0.05833,	Adjusted R-squared:  0.02211 
-#F-statistic: 1.611 on 1 and 26 DF,  p-value: 0.2157
-
-set.seed(2496)
-par(mar=c(5,5.2,4,2)+0.1)
-x3 = jitter(dfmax[[3]]$fledge,amount=0.1)
-plot(x=x3, y=dfmax[[3]]$r.skew, pch=19, cex=1.5, col=dfmax[[3]]$popcol, ylab=expression(paste("Genetic skew (",hat(rho)[0.0042],")")), xlab="Total fledged offspring", xlim=c(0,17), cex.lab=1.6, cex.axis=1.4, ylim=c(0,0.48),type="n")
-abline(coefficients(fledge.fit3)[1], coefficients(fledge.fit3)[2], col="grey60", lwd=2.3)
-abline(coefficients(fledge.fit3.all)[1], coefficients(fledge.fit3.all)[2], col="grey60", lwd=3.3, lty=3)
-points(x=jitter(dfmax3.c$fledge,amount=0.1), y=dfmax3.c$r.skew, pch=1, col=dfmax3.c$popcol, cex=2, lwd=3)
-points(x=x3, y=dfmax[[3]]$r.skew, pch=19, col=alpha(dfmax[[3]]$popcol,0.8), cex=2)
-points(x=x3, y=dfmax[[3]]$r.skew, pch=1, col=dfmax[[3]]$popcol, cex=2, lwd=3)
-text(x=12.5,y=0.34,substitute(paste(R^2," = ",rsq),list(rsq=round(summary(fledge.fit3)$r.squared,digits=2))),cex=1.2,col="grey20")
-text(x=14,y=0.25,substitute(paste(R^2," = ",rsq),list(rsq=round(summary(fledge.fit3.all)$r.squared,digits=2))),cex=1.2,col="grey20")
-#text(x=x3, y=jitter(dfmax[[3]]$r.skew,amount=0.01), dfmax[[3]]$ID)
-
-# relatedness cutoff of 0.0243058 (top 5% pairwise relatedness between Residents and translocated)
-
-dfmax4.c <- df.relate4[which(df.relate4$ID %in% dfmax[[4]]$ID == FALSE & !is.na(df.relate4$fledge)),]
-dfmax4.c$popcol <- sapply(dfmax4.c$ID,function(x,df){df$popcol[which(df$LAB_ID == x)]},USE.NAMES=FALSE, df=meta)
-dfmax4.comb <- rbind(dfmax[[4]], dfmax4.c)
-
-fledge.fit4 <- lm(r.skew ~ fledge, data=dfmax[[4]])
-
-#summary(fledge.fit4)
-
-#Call:
-#lm(formula = r.skew ~ fledge, data = dfmax[[4]])
-#
-#Residuals:
-#      Min        1Q    Median        3Q       Max 
-#-0.206099 -0.075977  0.000536  0.069014  0.200869 
-#
-#Coefficients:
-#            Estimate Std. Error t value Pr(>|t|)  
-#(Intercept) 0.074305   0.051311   1.448   0.1782  
-#fledge      0.011981   0.006075   1.972   0.0769 .
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-#
-#Residual standard error: 0.1251 on 10 degrees of freedom
-#Multiple R-squared:   0.28,	Adjusted R-squared:  0.208 
-#F-statistic: 3.889 on 1 and 10 DF,  p-value: 0.07687
-
-fledge.fit4.all <- lm(r.skew ~ fledge, data=dfmax4.comb)
-
-#summary(fledge.fit4.all)
-
-#Call:
-#lm(formula = r.skew ~ fledge, data = dfmax4.comb)
-#
-#Residuals:
-#     Min       1Q   Median       3Q      Max 
-#-0.16786 -0.09086 -0.02012  0.04182  0.23650 
-#
-#Coefficients:
-#            Estimate Std. Error t value Pr(>|t|)   
-#(Intercept) 0.091338   0.028269   3.231  0.00334 **
-#fledge      0.006956   0.004122   1.688  0.10346   
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-#
-#Residual standard error: 0.1122 on 26 degrees of freedom
-#Multiple R-squared:  0.09872,	Adjusted R-squared:  0.06406 
-#F-statistic: 2.848 on 1 and 26 DF,  p-value: 0.1035
-
-
-# Regression with Texaco excluded
-
-dfmax4.notex <- dfmax[[4]][-which(dfmax[[4]]$ID %in% meta$LAB_ID[which(meta$pop == "TEXACO")]),]
-fledge.fit4.notex <- lm(r.skew ~ fledge, data=dfmax4.notex)
-
-#summary(fledge.fit4.notex)
-
-#Call:
-#lm(formula = r.skew ~ fledge, data = dfmax4.notex)
-#
-#Residuals:
-#      Min        1Q    Median        3Q       Max 
-#-0.155279 -0.077328 -0.003509  0.071995  0.172344 
-#
-#Coefficients:
-#            Estimate Std. Error t value Pr(>|t|)  
-#(Intercept) 0.077328   0.044741   1.728   0.1180  
-#fledge      0.014815   0.005473   2.707   0.0241 *
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-#
-#Residual standard error: 0.109 on 9 degrees of freedom
-#Multiple R-squared:  0.4487,	Adjusted R-squared:  0.3875 
-#F-statistic: 7.326 on 1 and 9 DF,  p-value: 0.02413
-
-set.seed(2496)
-par(mar=c(5,5.2,4,2)+0.1)
-x4 = jitter(dfmax[[4]]$fledge,amount=0.1)
-plot(x=x4, y=dfmax[[4]]$r.skew, pch=19, cex=1.5, col=dfmax[[4]]$popcol, ylab=expression(paste("Genetic skew (",hat(rho)[0.024],")")), xlab="Total fledged offspring", xlim=c(0,17), cex.lab=1.6, cex.axis=1.4, ylim=c(0,0.45),type="n")
-abline(coefficients(fledge.fit4)[1], coefficients(fledge.fit4)[2], col="grey60", lwd=2.3)
-abline(coefficients(fledge.fit4.notex)[1], coefficients(fledge.fit4.notex)[2], col="grey60", lwd=2.3, lty=5)
-abline(coefficients(fledge.fit4.all)[1], coefficients(fledge.fit4.all)[2], col="grey60", lwd=3.3, lty=3)
-points(x=jitter(dfmax4.c$fledge,amount=0.1), y=dfmax4.c$r.skew, pch=1, col=dfmax4.c$popcol, cex=2, lwd=3)
-points(x=x4, y=dfmax[[4]]$r.skew, pch=19, col=alpha(dfmax[[4]]$popcol,0.8), cex=2)
-points(x=x4, y=dfmax[[4]]$r.skew, pch=1, col=dfmax[[4]]$popcol, cex=2, lwd=3)
-#text(x=15,y=0.23,substitute(paste(R^2," = ",rsq),list(rsq=round(summary(fledge.fit4)$r.squared,digits=2))),cex=1,col="grey20")
-#text(x=16,y=0.35,substitute(paste(R^2," = ",rsq),list(rsq=round(summary(fledge.fit4.notex)$r.squared,digits=2))),cex=1,col="grey20")
-#text(x=12,y=0.15,substitute(paste(R^2," = ",rsq),list(rsq=sprintf("%.2f",round(summary(fledge.fit4.all)$r.squared,digits=2)))),cex=1,col="grey20")
-legend(x=-0.5, y=0.470, substitute(paste("Highest genetic contributors / group, ", R^2," = ",rsq),list(rsq=round(summary(fledge.fit4)$r.squared,digits=2))),cex=1.025,col="grey20",lty=1,bty='n',lwd=2.3)
-legend(x=-0.5, y=0.445, substitute(paste("Highest without Texaco, ", R^2," = ",rsq),list(rsq=round(summary(fledge.fit4.notex)$r.squared,digits=2))),cex=1.025,col="grey20",lty=2,bty='n',lwd=2.3)
-legend(x=-0.5, y=0.420, substitute(paste("All ind., ", R^2," = ",rsq),list(rsq=sprintf("%.2f",round(summary(fledge.fit4.all)$r.squared,digits=2)))),cex=1.025,col="grey20",lty=3,bty='n',lwd=3.3)
-#legend(x=-0.5, y=0.475, "Highest genetic contributors / group", cex=1,col="grey20",lty=1,bty='n',lwd=2.3)
-#legend(x=-0.5, y=0.45, "Highest without Texaco",cex=1,col="grey20",lty=5,bty='n',lwd=2.3)
-#legend(x=-0.5, y=0.425, "All ind.",cex=1,col="grey20",lty=3,bty='n',lwd=2.3)
-#text(x=x4, y=jitter(dfmax[[4]]$r.skew,amount=0.01), dfmax[[4]]$ID)
-
-dev.off()
-
-# check distribution of errors
-
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/skew_fledging_model_assessment.pdf')
-
-res4 <- resid(fledge.fit4)
-qqnorm(res4, xlab="Theoretical quantiles", ylab="Observed quantiles", main="max skew ~ fledging", cex.lab=1.3, cex.axis=1.3, cex=1.2); qqline(res4, lty=2,col="gray40")
-plot(fitted(fledge.fit4), res4, xlab="Fitted values", ylab="Residuals", main="max skew ~ fledging", cex.lab=1.3, cex.axis=1.3, cex=1.2); abline(h=0, lty=2, col="gray40")
-
-shapiro.test(res4)
-
-#	Shapiro-Wilk normality test
-#
-#data:  res4
-#W = 0.97824, p-value = 0.9757
-# We fail to reject that the residuals are not normally distributed
-
-
-res4.notex <- resid(fledge.fit4.notex)
-qqnorm(res4.notex, xlab="Theoretical quantiles", ylab="Observed quantiles", main="max skew (Texaco excluded) ~ fledging", cex.lab=1.3, cex.axis=1.3, cex=1.2); qqline(res4.notex, lty=2,col="gray40")
-plot(fitted(fledge.fit4.notex), res4.notex, xlab="Fitted values", ylab="Residuals", main="max skew (Texaco excluded) ~ fledging", cex.lab=1.3, cex.axis=1.3, cex=1.2); abline(h=0, lty=2, col="gray40")
-
-shapiro.test(res4.notex)
-
-#	Shapiro-Wilk normality test
-#
-#data:  res4.notex
-#W = 0.97249, p-value = 0.9105
-# Fail to reject that the residuals are not normally distribruted
-
-res4.all <- resid(fledge.fit4.all)
-qqnorm(res4.all, xlab="Theoretical quantiles", ylab="Observed quantiles", main="skew ~ fledging", cex.lab=1.3, cex.axis=1.3, cex=1.2); qqline(res4.all, lty=2,col="gray40")
-plot(fitted(fledge.fit4.all), res4.all, xlab="Fitted values", ylab="Residuals", main="skew ~ fledging", cex.lab=1.3, cex.axis=1.3, cex=1.2); abline(h=0, lty=2, col="gray40")
-
-dev.off()
-
-shapiro.test(res4.all)
-
-#	Shapiro-Wilk normality test
-#
-#data:  res4.all
-#W = 0.91055, p-value = 0.02039
-# Reject that the residuals are normally distributed
-
-## Fledging and skew quantiles among translocated individuals
-meta <- read.table('M4_sequenced_FSJsamples_metadata.txt',head=TRUE)
-trans <- meta[which(meta$type == "T" | meta$LAB_ID == "I_049"),] # isolate translocated individuals (including I_049)
-
-# fledging quantiles
-fledge.ecdf <- ecdf(trans$total_fledged)
-
-fledge.ecdf(trans$total_fledged[which(trans$LAB_ID == "T_071")])
-#[1] 1
-
-fledge.ecdf(trans$total_fledged[which(trans$LAB_ID == "T_099")])
-# [1] 0.7857143
-
-fledge.ecdf(trans$total_fledged[which(trans$LAB_ID == "T_067")])
-# [1] 0.8571429
-
-fledge.ecdf(trans$total_fledged[which(trans$LAB_ID == "T_070")])
-# [1] 0.8571429
-
-fledge.ecdf(trans$total_fledged[which(trans$LAB_ID == "T_081")])
-# [1] 1
-
-fledge.ecdf(trans$total_fledged[which(trans$LAB_ID == "T_101")]) # Texaco
-# [1] 0.8928571
-
-fledge.ecdf(trans$total_fledged[which(trans$LAB_ID == "T_075")]) # Texaco
-# [1] 0.6785714
-
-fledge.ecdf(trans$total_fledged[which(trans$LAB_ID == "T_073")]) # Texaco
-# [1] 0.6071429
-
-# relatedness skew quantiles
-
-skew.ecdf <- ecdf(trans$r_skew_024)
-
-skew.ecdf(trans$r_skew_024[which(trans$LAB_ID == "T_081")])
-# [1] 0.8333333
-
-skew.ecdf(trans$r_skew_024[which(trans$LAB_ID == "T_070")])
-# [1] 0.5
-
-## Genetic skew against translocation information
-# note "HY" (hatch year) in age of introduction have been recoded as zero.
-
-meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
-meta$popcol <- popcolor(meta)
-
-# set months since translocation
-
-month <- c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
-dates <- NULL
-month.count <- 0
-for (i in seq(from=min(meta$translocation_year,na.rm=TRUE), to=max(meta$translocation_year,na.rm=TRUE), by=1)) {
-	for (j in month) {
-		dates <- rbind(dates, data.frame(time=paste0(i,"_",j), months_since = month.count))
-		month.count <- month.count+1
-	}
-}
-
-meta$trans_chrono <- sapply(paste0(meta$translocation_year, "_", meta$translocation_month), function(x,df){idx = ifelse(x == "NA_NA", NA, which(df$time == x)); val = ifelse(is.na(idx), NA, df$months_since[idx]); return(val)}, USE.NAMES=FALSE, df=dates)
-
-meta$trans_chrono <- meta$trans_chrono - min(meta$trans_chrono, na.rm = TRUE) # scale to first introduction
-
-# set resident translocation year to one year before first translocation
-meta$trans_chrono[which(meta$pop == "Resident")] = -1
-
-# subset of individuals with highest skew stat per family group (i.e. the most likely reproducers)
-
-site1.1 <- c("T_071", "T_090", "T_097") 
-site12.1 <- c("T_068","T_089")
-site13.1 <- c("T_079", "T_081", "T_083", "T_084", "T_086", "T_100") # Site 13 group 1
-site13.2 <- c("T_070", "T_074", "T_077", "T_078", "T_080") # Site 13 group 2
-site13.3 <- c("T_067", "T_082", "T_098", "I_049") # Site 13 group 3
-tex.1 <- c("T_073","T_075","T_101")
-wellres.1 <- c("E_030", "E_036", "E_037", "E_039", "E_041") # Wellfield residents group 1
-wellres.2 <- c("I_045", "I_046", "E_032", "E_035", "E_038", "E_042")
-wellres.3 <- c("I_050", "E_034")
-
-groups <- list(site1.1, site12.1, site13.1, site13.2, site13.3, tex.1, wellres.1, wellres.2, wellres.3)
-
-maxidx <- NULL
-group.ind <- NULL
-
-set.seed(4642)
-
-for (i in 1:length(groups)) {
-	subdf <- meta[which(meta$LAB_ID %in% groups[[i]]),]
-	idx <- which(subdf$r_skew_024 == max(subdf$r_skew_024, na.rm=TRUE))
-	maxind <- subdf$LAB_ID[ifelse(length(idx) > 1, sample(x=idx,size=1), idx)] # randomly sample 1 individual when there are ties for highest skew
-	maxidx <- c(maxidx, which(meta$LAB_ID == maxind))
-	group.ind <- c(group.ind, groups[[i]])
-}
-
-maxrho.df <- rbind(meta[maxidx,], meta[which(meta$LAB_ID %in% group.ind == FALSE & meta$pop != "Contemporary"),])
-maxrho.df.c <- meta[which(meta$LAB_ID %in% maxrho.df$LAB_ID == FALSE & meta$pop != "Contemporary"),]
-
-# year of introduction without residents
-
-maxrho.df.nores <- maxrho.df[-which(maxrho.df$pop == "Resident"),]
-maxrho.df.nores.c <- maxrho.df.c[-which(maxrho.df.c$pop == "Resident"),]
-maxrho.df.nores.comb <- rbind(maxrho.df.nores, maxrho.df.nores.c)
-
-intro.nores.fit <- lm(r_skew_024 ~ trans_chrono, data=maxrho.df.nores)
-
-#Call:
-#lm(formula = r_skew_024 ~ trans_chrono, data = maxrho.df.nores)
-#
-#Residuals:
-#     Min       1Q   Median       3Q      Max 
-#-0.17048 -0.09192 -0.03888  0.05317  0.26959 
-#
-#Coefficients:
-#              Estimate Std. Error t value Pr(>|t|)
-#(Intercept)  0.1148004  0.0857586   1.339    0.210
-#trans_chrono 0.0005923  0.0014088   0.420    0.683
-#
-#Residual standard error: 0.1461 on 10 degrees of freedom
-#  (14 observations deleted due to missingness)
-#Multiple R-squared:  0.01737,	Adjusted R-squared:  -0.08089 
-#F-statistic: 0.1768 on 1 and 10 DF,  p-value: 0.6831
-
-intro.nores.fit.all <- lm(r_skew_024 ~ trans_chrono, data=maxrho.df.nores.comb)
-
-#summary(intro.nores.fit.all)
-
-#Call:
-#lm(formula = r_skew_024 ~ trans_chrono, data = maxrho.df.nores.comb)
-#
-#Residuals:
-#     Min       1Q   Median       3Q      Max 
-#-0.16498 -0.07895 -0.01447  0.04724  0.29670 
-#
-#Coefficients:
-#               Estimate Std. Error t value Pr(>|t|)   
-#(Intercept)   0.1757963  0.0497186   3.536  0.00161 **
-#trans_chrono -0.0009011  0.0007663  -1.176  0.25071   
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-#
-#Residual standard error: 0.1172 on 25 degrees of freedom
-#  (16 observations deleted due to missingness)
-#Multiple R-squared:  0.05241,	Adjusted R-squared:  0.01451 
-#F-statistic: 1.383 on 1 and 25 DF,  p-value: 0.2507
-
-pdf(file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/plots/skew_vs_trans_chronology.pdf')
-
-set.seed(2496)
-par(mar=c(5,5.2,4,2)+0.5)
-x.intro = jitter(maxrho.df.nores$trans_chrono,amount=0.7)
-x.intro[which(x.intro < 0)] <- 0
-plot(x=x.intro, y=maxrho.df.nores$r_skew_024, pch=19, cex=1.5, col=maxrho.df.nores$popcol, ylab=expression(paste("Genetic skew (",hat(rho)[0.024],")")), xlab="Translocation period (months)", xlim=c(0,max(meta$trans_chrono, na.rm=TRUE)), cex.lab=1.6, cex.axis=1.4, ylim=c(0,0.45),type="n")
-abline(coefficients(intro.nores.fit)[1], coefficients(intro.nores.fit)[2], col="grey60", lwd=2.3)
-abline(coefficients(intro.nores.fit.all)[1], coefficients(intro.nores.fit)[2], col="grey60", lwd=3.3, lty=3)
-x.intro.c <- jitter(maxrho.df.nores.c$trans_chrono,amount=0.7)
-x.intro.c[which(x.intro.c < 0)] <- 0 
-points(x=x.intro.c, y=maxrho.df.nores.c$r_skew_024, pch=1, col=maxrho.df.nores.c$popcol, cex=2, lwd=3)
-points(x=x.intro, y=maxrho.df.nores$r_skew_024, pch=19, col=alpha(maxrho.df.nores$popcol,0.8), cex=2)
-points(x=x.intro, y=maxrho.df.nores$r_skew_024, pch=1, col=maxrho.df.nores$popcol, cex=2, lwd=3)
-legend(x=-0.5, y=0.53, substitute(paste("Highest genetic contributors / group, ", R^2," = ",rsq),list(rsq=round(summary(intro.nores.fit)$r.squared,digits=2))),cex=1.025,col="grey20",lty=1,bty='n',lwd=2.3,xpd=TRUE)
-legend(x=-0.5, y=0.50, substitute(paste("All ind., ", R^2," = ",rsq),list(rsq=round(summary(intro.nores.fit.all)$r.squared,digits=2))),cex=1.025,col="grey20",lty=1,bty='n',lwd=2.3,xpd=TRUE)
-text(x=x.intro, y=jitter(maxrho.df.nores$r_skew_024,amount=0.03), maxrho.df.nores$LAB_ID)
-
-dev.off()
-
-res.trans_chron <- resid(intro.nores.fit)
-shapiro.test(res.trans_chron)
-
-#	Shapiro-Wilk normality test
-#
-#data:  res.trans_chron
-#W = 0.90173, p-value = 0.167
-
-res.trans_chron.all <- resid(intro.nores.fit.all)
-shapiro.test(res.trans_chron.all)
-
-#	Shapiro-Wilk normality test
-#
-#data:  res.trans_chron.all
-#W = 0.93123, p-value = 0.07409
-
-
-# year of introduction with residents
-
-maxrho.df.comb <- rbind(maxrho.df, maxrho.df)
-
-intro.fit <- lm(r_skew_024 ~ trans_chrono, data=maxrho.df)
-
-#summary(intro.fit)
-
-#Call:
-#lm(formula = r_skew_024 ~ trans_chrono, data = maxrho.df)
-#
-#Residuals:
-#     Min       1Q   Median       3Q      Max 
-#-0.17006 -0.07472 -0.01828  0.05502  0.26941 
-#
-#Coefficients:
-#              Estimate Std. Error t value Pr(>|t|)  
-#(Intercept)  0.1159808  0.0397999   2.914   0.0101 *
-#trans_chrono 0.0005753  0.0008007   0.719   0.4828  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-#
-#Residual standard error: 0.1199 on 16 degrees of freedom
-#  (14 observations deleted due to missingness)
-#Multiple R-squared:  0.03126,	Adjusted R-squared:  -0.02928 
-#F-statistic: 0.5164 on 1 and 16 DF,  p-value: 0.4828
-
-
-intro.fit.all <- lm(r_skew_024 ~ trans_chrono, data=maxrho.df.comb)
-
-#summary(intro.fit.all)
-
-#Call:
-#lm(formula = r_skew_024 ~ trans_chrono, data = maxrho.df.comb)
-#
-#Residuals:
-#     Min       1Q   Median       3Q      Max 
-#-0.17006 -0.07973 -0.01828  0.05824  0.26941 
-#
-#Coefficients:
-#              Estimate Std. Error t value Pr(>|t|)    
-#(Intercept)  0.1159808  0.0273025   4.248 0.000158 ***
-#trans_chrono 0.0005753  0.0005493   1.047 0.302260    
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-#
-#Residual standard error: 0.1163 on 34 degrees of freedom
-#  (28 observations deleted due to missingness)
-#Multiple R-squared:  0.03126,	Adjusted R-squared:  0.002771 
-#F-statistic: 1.097 on 1 and 34 DF,  p-value: 0.3023
-
-
-set.seed(2496)
-par(mar=c(5,5.2,4,2)+0.5)
-x.intro = jitter(maxrho.df$trans_chrono,amount=0.7)
-#x.intro[which(x.intro < 0)] <- 0
-plot(x=x.intro, y=maxrho.df$r_skew_024, pch=19, cex=1.5, col=maxrho.df$popcol, ylab=expression(paste("Genetic skew (",hat(rho)[0.024],")")), xlab="Translocation period (months)", xlim=c(-1,max(meta$trans_chrono, na.rm=TRUE)), cex.lab=1.6, cex.axis=1.4, ylim=c(0,0.45),type="n")
-abline(coefficients(intro.fit)[1], coefficients(intro.fit)[2], col="grey60", lwd=2.3)
-abline(coefficients(intro.fit.all)[1], coefficients(intro.fit)[2], col="grey60", lwd=3.3, lty=3)
-x.intro.c <- jitter(maxrho.df.c$trans_chrono,amount=0.7)
-#x.intro.c[which(x.intro.c < 0)] <- 0 
-points(x=x.intro.c, y=maxrho.df.c$r_skew_024, pch=1, col=maxrho.df.c$popcol, cex=2, lwd=3)
-points(x=x.intro, y=maxrho.df$r_skew_024, pch=19, col=alpha(maxrho.df$popcol,0.8), cex=2)
-points(x=x.intro, y=maxrho.df$r_skew_024, pch=1, col=maxrho.df$popcol, cex=2, lwd=3)
-legend(x=-0.5, y=0.53, substitute(paste("Highest genetic contributors / group, ", R^2," = ",rsq),list(rsq=round(summary(intro.fit)$r.squared,digits=2))),cex=1.025,col="grey20",lty=1,bty='n',lwd=2.3,xpd=TRUE)
-legend(x=-0.5, y=0.50, substitute(paste("All ind., ", R^2," = ",rsq),list(rsq=round(summary(intro.fit.all)$r.squared,digits=2))),cex=1.025,col="grey20",lty=1,bty='n',lwd=2.3,xpd=TRUE)
-text(x=x.intro, y=jitter(maxrho.df$r_skew_024,amount=0.03), maxrho.df$LAB_ID)
-
-
-------------- TL TODO
-
-### SKEW ANALYSIS
-
-## extract census for only the core population (Mosaic Wellfield + Duette Preserve + Coker Tract) from metadata
-
-workdir='/home/tyler/Dropbox/research/jay/mosaic/metadata/20230512_metadata'
-
-$ R
---- BEGIN R CODE FOR EXTRACTING CORE POP INDIVIDUALS ---
 census <- read.csv(/home/tyler/Dropbox/research/jay/mosaic/metadata/20230512_metadata/Longform_Data_05122023.tsv',head=TRUE,sep="\t")
 core <- census[which(census$PROPERTY == "MW" | census$PROPERTY == "DUETTE PRESERVE" | census$PROPERTY == "COKER"),]
 core.ids <- toupper(unique(core$COLOR_ID)) # unique set of IDs for birds censused in the core region
 write.table(data.frame(ID=core.ids),file='/home/tyler/Dropbox/research/jay/mosaic/metadata/20230512_metadata/core_pop/core_pop_color_ids.txt',col.names=FALSE,row.names=FALSE,quote=FALSE)
 write.table(core,file='/home/tyler/Dropbox/research/jay/mosaic/metadata/20230512_metadata/core_pop/Longform_Data_05122023_core.tsv',col.names=TRUE,row.names=FALSE,quote=FALSE,sep="\t")
 
---- END R CODE FOR EXTRACTING CORE POP INDIVIDUALS ---
+--- end R code for extracting core pop individuals ---
 
-## make inputs for makePed.pl
-wordir='/home/tyler/Dropbox/research/jay/mosaic/pedigree'
+# Make inputs for makePed.pl, which constructs the pedigree in ped format.
 
-# format census data
-R
---- BEGIN R CODE FOR FORMATING CENSUS DATA ---
+--- begin R code for formatting census data ---
 census <- read.csv('/home/tyler/Dropbox/research/jay/mosaic/metadata/20230512_metadata/Longform_Data_05122023.tsv',head=TRUE,sep="\t")
 census.sub <- census[which(census$Present == 1),]
 write.table(census.sub[,c(1,2,3,4,5,12)],file='/home/tyler/Dropbox/research/jay/mosaic/pedigree/mosaic_census_20230512.tsv',col.names=TRUE,row.names=FALSE,sep="\t",quote=FALSE)
---- END R CODE FOR FORMATTING CENSUS DATA ---
+--- end R code for formatting census data ---
 
-$ cut -f2,3,12 /home/tyler/Dropbox/research/jay/mosaic/metadata/20230512_metadata/CUMULATIVE_NESTING_DATA_FINAL_05122023.tsv | sed -s 's/\t/,/g' > cumulative_nesting_data_20230512.csv
-$ cut -f1,2,5,10,16,17 /home/tyler/Dropbox/research/jay/mosaic/metadata/20230512_metadata/JAYID_05122023.tsv | sed -s 's/\t/,/g' > jayid_20230512.csv
+--- start bash code ---
 
-## Expected Genetic contribution based on the pedigree
+cut -f2,3,12 /home/tyler/Dropbox/research/jay/mosaic/metadata/20230512_metadata/CUMULATIVE_NESTING_DATA_FINAL_05122023.tsv | sed -s 's/\t/,/g' > cumulative_nesting_data_20230512.csv
+cut -f1,2,5,10,16,17 /home/tyler/Dropbox/research/jay/mosaic/metadata/20230512_metadata/JAYID_05122023.tsv | sed -s 's/\t/,/g' > jayid_20230512.csv
 
-# make pedigree input for nadiv R package
+--- end bash code ---
 
-workdir='/home/tyler/Dropbox/research/jay/mosaic/pedigree'
+## Expected genetic contribution based on the pedigree
 
-$ ./makePed.pl jayid_20230512.csv cumulative_nesting_data_20230512.csv mosaic_census_20230512.tsv 2> ./troubleshoot/mosaic_ped_20230512_raw_warnings.txt > mosaic_ped_20230512_raw.csv
+# Calculate pairwise relatedness from the pedigree
 
-# manually modified in some instances the following individuals per Lauren's notes:
+Make pedigree input for nadiv R package to calculate pedigree-based relatedness.
+
+--- start bash code ----
+
+./makePed.pl jayid_20230512.csv cumulative_nesting_data_20230512.csv mosaic_census_20230512.tsv 2> ./troubleshoot/mosaic_ped_20230512_raw_warnings.txt > mosaic_ped_20230512_raw.csv
+
+--- end bash code ---
+
+Manually modified the pedigree in some instances for the following individuals per Lauren's notes:
+
 SR-LK (1063-09904): cohort_last set to 2004 per Lauren's notes "banded as HY august 2004 and never seen again".
 OK-OS (1573-41864): Did not change missing survival data as I only see it recorded in Site 18. Luaren's notes "banded June 2004 and not seen on the July 2004 census or thereafter".
 GF-SG (1713-54398): set cohort and cohort_last to 2016 per Lauren's notes "banded as immigrant in 2016 and never observed on a census" and this bird nested in DP.
@@ -3864,10 +2861,9 @@ LDZ-F (1873-26844): set cohort_last to individuals year class (2021) per Lauren'
 BDZ-F (1873-26845): set cohort_last to individuals year class (2021) per Lauren's notes "banded as Hy and never seen again"
 WDZ-F (1873-26846): set cohort_last to individuals year class (2021) per Lauren's notes "banded as Hy and never seen again"
 
-# set cohort and population for pedigree individuals to year of translocation and donor patch respectively
-R
+# Set cohort and population for translocated pedigree individuals to year of translocation and donor patch respectively.
 
---- BEGIN R CODE FOR RECONCILING TRANSLOCATION WITH PEDIGREE DATA ---
+--- begin R code for reconciling translocation with pedigree data ---
 
 ped <- read.csv('/home/tyler/Dropbox/research/jay/mosaic/pedigree/mosaic_ped_20230512_raw.csv',head=TRUE, na.strings="*")
 trans <- read.csv('/home/tyler/Dropbox/research/jay/mosaic/metadata/Translocated_Jay_Individual_Statistics.tsv',head=TRUE,sep="\t",na.strings="*")
@@ -3901,19 +2897,18 @@ core <- ped[which(!is.na(ped$COHORT)),] # individuals never censused in (i.e. pa
 write.table(core,file='/home/tyler/Dropbox/research/jay/mosaic/pedigree/cr_ped_20230512.csv',col.names=TRUE,row.names=FALSE,quote=FALSE,na="*",sep=",")
 write.table(core,file='/home/tyler/Dropbox/research/jay/mosaic/pedigree/cr_ped_20230512.tsv',col.names=TRUE,row.names=FALSE,quote=FALSE,na="*",sep="\t")
 
---- END R CODE FOR RECONCILING TRANSLOCATION WITH PEDIGREE DATA ---
+--- end R code for reconciling translocation with pedigree data ---
 
-# make additive genetic relatedness matrix based on pedigree
+
+Make additive genetic relatedness matrix based on pedigree
 
 --- start R code for pedigree-based relatedness matrix ---
-
-R
 
 # load required packages
 library(nadiv)
 
 # read in and format pedigree
-# using full M4 pedigree so potentially account for relatdness among CR founders
+# using full M4 pedigree to account for relatdness among CR founders
 ped.raw <- read.csv('/home/tyler/Dropbox/research/jay/mosaic/pedigree/mosaic_ped_20230512.csv',head=TRUE)
 
 ped2 <- prepPed(ped.raw[,1:4], gender='SEX', check=TRUE)
@@ -3934,12 +2929,10 @@ write.table(r_mat.core,file='/home/tyler/Dropbox/research/jay/mosaic/pedigree/cr
 
 --- end R code for pedigree-based relatedness matrix ---
 
-## calculate expected genetic contribution in 2021 cohort with relateStats
 
-workdir='/home/tyler/Dropbox/research/jay/mosaic/pedigree'
+## Expected genetic contribution to 2021 cohort with relateStats
 
-# make inputs for relateStats
-R
+Make inputs for relateStats
 
 --- begin R code for making relateStats inputs ---
 
@@ -3955,14 +2948,7 @@ anc1 <- rbind(anc1,ind.e)
 anc1.core <- data.frame(ID = anc1$ID[which(anc1$ID %in% core$ID)])
 write.table(anc1.core,file='/home/tyler/Dropbox/research/jay/mosaic/pedigree/relateStat_inputs/CR_T_IE_ancestors_20230512.txt',col.names=FALSE,row.names=FALSE,quote=FALSE)
 
-# make file of T, IE, and I ancestors
-anc2 <- data.frame(ID=jaymeta$COLOR_ID[which(jaymeta$Biological_Origin_Status == "T" | jaymeta$Biological_Origin_Status == "IE" | jaymeta$Biological_Origin_Status == "I")])
-anc2 <- rbind(anc2, ind.e)
-anc2.band <- anc2$ID[-grep("UNBAND",anc2$ID)]
-anc2.core <- data.frame(ID=anc2.band[-which(anc2.band %in% core$ID == FALSE)])
-write.table(anc2.core,file='/home/tyler/Dropbox/research/jay/mosaic/pedigree/relateStat_inputs/CR_T_IE_I_ancestors_20230512.txt',col.names=FALSE,row.names=FALSE,quote=FALSE)
-
-# make file of sequenced contemporary color IDs
+# make file of sequenced contemporary color band IDs
 
 seqmeta <- read.table('~/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
 c_seq_ids <- unname(sapply(seqmeta$USFWS_ID[which(seqmeta$pop == "Contemporary")],function(x,df){df$COLOR_ID[which(df$FEDERAL_ID == x)]},df=jaymeta))
@@ -3984,11 +2970,9 @@ for (i in min(lr$YEAR_CLASS,na.rm=TRUE):max(lr$YEAR_CLASS,na.rm=TRUE)){
 
 --- end R code for making relateStats inputs ---
 
-# exclude unbanded individuals from list of ancestors
-# grep -i -v UNBANDED ./relateStat_inputs/MW_T_IE_I_ancestors_20230512.txt > ./relateStat_inputs/MW_T_IE_I_banded_ancestors_20230512.txt
+NOTE: All of the following samples (except RSW-K) considered residents in the genetic analyses were missing among the T, IE, and I ancestors so 
+were manually added to the ancestors list file: /home/tyler/Dropbox/research/jay/mosaic/pedigree/relateStat_inputs/CR_T_IE_ancestors_20230512.txt.
 
-# NOTE: All of the following samples except RSW-K, were considered "E" in the genetic analyses were missing from the T, IE, and I ancestors so 
-# were manually added to /home/tyler/Dropbox/research/jay/mosaic/pedigree/relateStat_inputs/CR_T_IE_ancestors_20230512.txt and MW_T_IE_I_ancestors_20230512.txt
 SW-RK (LR)
 SW-OKB (LR)
 SW-LK (LR)
@@ -3997,53 +2981,48 @@ SW-BK (LR)
 K-SRB (LR)
 RSW-K (Donor Population, T_072 in the genetic data) was not translocated into the Core Region. This bird was from Site 1B and immigrated into Little Manatee State Park (which is not part of the Core)
 
-## calculate contributions from Mosaic pedigree with relateStats
+## Calculate expected genetic contributions from Mosaic pedigree with relateStats
 
-workdir='/home/tyler/Dropbox/research/jay/mosaic/pedigree/'
+Abbreviations:
+T = translocated.
+IE = AHY bird banded in Mosaic Wellfield in 2002 prior to translocations (residents).
+I = unbanded (excluded from skew analyses).
 
-# Calculate contribution of T, IE, and I ancestors to population from 2002 (oldest cohort) to 2022 (most recent cohort)
+Calculate contribution of T and IE ancestors to population from 2002 (oldest cohort) to 2022 (most recent cohort).
 
-$ for i in {2002..2022}; do echo "$i"; ~/code_projects/PopGenomicsTools/relateStats --pedstat 1 --ped cr_ped_20230512.tsv --rmat cr_ped_20230512_relatedness_matrix.txt --anc ./relateStat_inputs/CR_T_IE_I_ancestors_20230512.txt --time2 "$i" --draw --out "./results/pop_temporal/T_IE_I_20230512_${i}_pop_contribution" 2> "./results/pop_temporal/T_IE_I_20230512_${i}_pop_contribution.log"; wait; done
+--- start bash code ---
 
-# Calculate contribution of T and IE ancestors to population from 2002 to 2022
+for i in {2002..2022}; do echo "$i"; ~/code_projects/PopGenomicsTools/relateStats --pedstat 1 --ped cr_ped_20230512.tsv --rmat cr_ped_20230512_relatedness_matrix.txt --anc ./relateStat_inputs/CR_T_IE_ancestors_20230512.txt --time2 "$i" --draw --out "./results/pop_temporal/T_IE_20230512_${i}_pop_contribution" 2> "./results/pop_temporal/T_IE_20230512_${i}_pop_contribution.log"; wait; done
 
-$ for i in {2002..2022}; do echo "$i"; ~/code_projects/PopGenomicsTools/relateStats --pedstat 1 --ped cr_ped_20230512.tsv --rmat cr_ped_20230512_relatedness_matrix.txt --anc ./relateStat_inputs/CR_T_IE_ancestors_20230512.txt --time2 "$i" --draw --out "./results/pop_temporal/T_IE_20230512_${i}_pop_contribution" 2> "./results/pop_temporal/T_IE_20230512_${i}_pop_contribution.log"; wait; done
+--- end bash code ---
 
-# Calculate contribution of T, IE, and I ancestors to local recruits born in 2004 (first local recruit) to 2022 (latest local recruit cohort)
+Calculate contribution of T and IE ancestors to local recruits born in 2004 (first local recruit) to 2022 (latest local recruit cohort).
 
-$ for i in {2004..2022}; do COHORT_FILE="./relateStat_inputs/CR_LR_ids_20230512_${i}.txt"; echo "$COHORT_FILE"; ~/code_projects/PopGenomicsTools/relateStats --pedstat 1 --ped cr_ped_20230512.tsv --rmat cr_ped_20230512_relatedness_matrix.txt --anc ./relateStat_inputs/CR_T_IE_I_ancestors_20230512.txt --cohort "$COHORT_FILE" --draw --out "./results/lr_temporal/T_IE_I_20230512_to_${i}_LR_contribution" 2> "./results/lr_temporal/T_IE_I_20230512_to_${i}_LR_contribution.log"; wait; done
+--- start bash code ---
 
-# Calculate contribution of T and IE ancestors to local recruits born in 2004 (first local recruit) to 2022 (latest local recruit cohort)
+for i in {2004..2022}; do COHORT_FILE="./relateStat_inputs/CR_LR_ids_20230512_${i}.txt"; echo "$COHORT_FILE"; ~/code_projects/PopGenomicsTools/relateStats --pedstat 1 --ped cr_ped_20230512.tsv --rmat cr_ped_20230512_relatedness_matrix.txt --anc ./relateStat_inputs/CR_T_IE_ancestors_20230512.txt --cohort "$COHORT_FILE" --draw --out "./results/lr_temporal/T_IE_20230512_to_${i}_LR_contribution" 2> "./results/lr_temporal/T_IE_20230512_to_${i}_LR_contribution.log"; wait; done
 
-$ for i in {2004..2022}; do COHORT_FILE="./relateStat_inputs/CR_LR_ids_20230512_${i}.txt"; echo "$COHORT_FILE"; ~/code_projects/PopGenomicsTools/relateStats --pedstat 1 --ped cr_ped_20230512.tsv --rmat cr_ped_20230512_relatedness_matrix.txt --anc ./relateStat_inputs/CR_T_IE_ancestors_20230512.txt --cohort "$COHORT_FILE" --draw --out "./results/lr_temporal/T_IE_20230512_to_${i}_LR_contribution" 2> "./results/lr_temporal/T_IE_20230512_to_${i}_LR_contribution.log"; wait; done
+--- end bash code ---
 
-# Calculate contribution of T, IE, and I ancestors to sequenced contemporary individuals
+Calculate contribution of T and IE ancestors to sequenced contemporary individuals.
 
-$ ~/code_projects/PopGenomicsTools/relateStats --pedstat 1 --ped cr_ped_20230512.tsv --rmat cr_ped_20230512_relatedness_matrix.txt --anc ./relateStat_inputs/CR_T_IE_I_ancestors_20230512.txt --cohort ./relateStat_inputs/CR_sequenced_contemporary_ids_20230512.txt --draw --out ./results/sequenced_contemporary/T_IE_I_20230512_to_seq_contemporary 2> ./results/sequenced_contemporary/T_IE_I_20230512_to_seq_contemporary.log
-
-# Calculate contribution of T and IE ancestors to sequenced contemporary individuals
+--- start bash code ---
 
 $ ~/code_projects/PopGenomicsTools/relateStats --pedstat 1 --ped cr_ped_20230512.tsv --rmat cr_ped_20230512_relatedness_matrix.txt --anc ./relateStat_inputs/CR_T_IE_ancestors_20230512.txt --cohort ./relateStat_inputs/CR_sequenced_contemporary_ids_20230512.txt --draw --out ./results/sequenced_contemporary/T_IE_20230512_to_seq_contemporary 2> ./results/sequenced_contemporary/T_IE_20230512_to_seq_contemporary.log
 
-## calculate contributions to Contemporary sample based on genomic data
+--- end bash code ---
 
-workdir='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness'
+## ---------- SKEW ANALYSIS WITH GENOMIC DATA ---------- ##
 
-Skew analaysis involving all sequenced individuals setting the --background_r to the 95th quantile for relatedness between resident CR and translocated individuals (0.0243058).
+## Calculate genetic skew (K) statistic for all sequenced translocated and resident individuals with respect to the contemporary sample with --background_r set to the 95th quantile 
+## for relatedness between resident CR and translocated individuals (0.0243058).
 
-$ ~/code_projects/PopGenomicsTools/relateStats --skewstat 1 --rmat fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix_relateStats_input.txt --anc MW_founders_list.txt --cohort MW_contemporary_list.txt --background_r 0.0243058 --out ./skew/T_E_I_M4_to_contemporary_contributions_c0.0243058
+--- begin R code for subsetting genetic relatedness matrix ---
 
-$ ~/code_projects/PopGenomicsTools/relateStats --skewstat 3 --rmat fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix_relateStats_input.txt --anc MW_founders_list.txt --cohort MW_contemporary_list.txt --background_r 0.0243058 --out ./skew/T_E_I_M4_to_contemporary_contributions_c0.0243058
-
-Skew analysis with only the Core Region individuals
-
-R
---- BEGIN R CODE FOR SUBSETTING GENETIC RELATEDNESS MATRIX ---
 rmat <- as.matrix(read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix_relateStats_input.txt', head=TRUE))
 idmap <- read.csv('/home/tyler/Dropbox/research/jay/mosaic/metadata/jayid_map_20230512.txt',head=TRUE,sep="\t")
 core <- read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/cr_ped_20230512.tsv',head=TRUE)
 core.anc <- read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/relateStat_inputs/CR_T_IE_ancestors_20230512.txt',head=FALSE) # T, IE
-core.anc2 <- read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/relateStat_inputs/CR_T_IE_I_ancestors_20230512.txt',head=FALSE) # T, IE, I
 colnames(rmat) <- toupper(unname(sapply(colnames(rmat),function(x,df){df$COLOR_ID[which(df$LAB_ID == x)]},df=idmap))) # convert relatedness IDs to COLOR_IDs
 idx <- which(colnames(rmat) %in% core$ID)
 rmat.sub <- rmat[idx,idx]
@@ -4052,22 +3031,22 @@ seq.ids <- colnames(rmat)
 # write relatedness matrix containing only Core Region individuals
 write.table(rmat.sub,file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix_relateStats_input_CR.txt',col.names=TRUE,row.names=FALSE,quote=FALSE)
 
-# Make lists of sequencecd ancestors and contemporary individuals
-# T, IE
+# Make list of sequenced T and IE ancestors and contemporary individuals
 write.table(data.frame(ID=seq.ids[which(seq.ids %in% core.anc$V1)]),file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/CR_T_IE_sequenced.txt',col.names=FALSE,row.names=FALSE,quote=FALSE)
-# T, IE, I
-write.table(data.frame(ID=seq.ids[which(seq.ids %in% core.anc2$V1)]),file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/CR_T_IE_I_sequenced.txt',col.names=FALSE,row.names=FALSE,quote=FALSE)
---- END R CODE FOR SUBSETTING GNGETIC RELATEDNESS MATRIX ---
 
-# skew stat for CR T, IE, I individuals
-$ ~/code_projects/PopGenomicsTools/relateStats --skewstat 3 --rmat fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix_relateStats_input_CR.txt --anc CR_T_IE_I_sequenced.txt --cohort /home/tyler/Dropbox/research/jay/mosaic/pedigree/relateStat_inputs/CR_sequenced_contemporary_ids_20230512.txt --background_r 0.0243058 --out ./skew/CR_T_IE_I_to_C_contributions_c0.0243058
+--- end R code for subsetting genetic relatedness matrix ---
 
-# skew stat for CR T and IE individuals
-$ ~/code_projects/PopGenomicsTools/relateStats --skewstat 3 --rmat fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix_relateStats_input_CR.txt --anc CR_T_IE_sequenced.txt --cohort /home/tyler/Dropbox/research/jay/mosaic/pedigree/relateStat_inputs/CR_sequenced_contemporary_ids_20230512.txt --background_r 0.0243058 --out ./skew/CR_T_IE_to_C_contributions_c0.0243058
+Calculate skew statistic for CR T and IE individuals
 
-## Plot of Average rank-weighted skew
+--- start bash code ---
 
---- BEGIN R CODE FOR PLOTTING INDIVIDUAL AVERAGEE RANK-WEIGHTED SKEW DISTRIBUTION ---
+./PopGenomicsTools/relateStats --skewstat 3 --rmat fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix_relateStats_input_CR.txt --anc CR_T_IE_sequenced.txt --cohort /home/tyler/Dropbox/research/jay/mosaic/pedigree/relateStat_inputs/CR_sequenced_contemporary_ids_20230512.txt --background_r 0.0243058 --out ./skew/CR_T_IE_to_C_contributions_c0.0243058
+
+--- end bash code ---
+
+## Plot of average rank-weighted skew distribution
+
+--- begin R code for plotting individual average rank-weighted skew distribution ---
 
 library(scales)
 
@@ -4080,17 +3059,15 @@ meta$COLOR_ID[which(meta$COLOR_ID == "*")] <- NA
 
 # nonparametric measure of skew
 npskew = (mean(kstat$Swtr) - median(kstat$Swtr))/sd(kstat$Swtr)
-#> npskew
+npskew
 #[1] 0.252958
 
 kstat.sort <- kstat[order(-kstat$Swtr),] # sort data.frame by descending skew statistics
 
-# plot contribution statistic, K
-# png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/k_statistic_distribution.png',width=9, height=7, units='in', res=300)
+# plot genetic skew statistic, K
 # png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/k_statistic_distribution_v2.png',width=9, height=7, units='in', res=300) # use italics in axis titles
 X11(width=9,height=7)
 par(mar=c(5,5.2,4,2)+0.1)
-#plot(x=1:nrow(kstat.sort), y=kstat.sort$Swtr, type="l", lwd=4, col="grey60", ylab = "Average weighted relatedness (K)", xlab="", xaxt='n',cex.lab=1.6, cex.axis=1.4)
 plot(x=1:nrow(kstat.sort), y=kstat.sort$Swtr, type="l", lwd=4, col="grey60", ylab = expression(paste("Average weighted relatedness (", italic("K"), ")")), xlab="", xaxt='n',cex.lab=1.6, cex.axis=1.4) # v2
 axis(1, at=1:nrow(kstat.sort), labels=kstat.sort$ID,cex=1.2,las=2)
 # add points
@@ -4098,16 +3075,15 @@ pointcols = meta$popcol[sapply(kstat.sort$ID,function(x,df){which(df$COLOR_ID ==
 points(x=1:nrow(kstat.sort), y=kstat.sort$Swtr, pch=19, col=alpha(pointcols,0.8), cex=1.7)
 # add vertical bars
 lh = kstat.sort$Swtr
-#lh[which(lh < 0.008)] = 0
 lines(x=1:nrow(kstat.sort), y=lh, type="h", lwd=13.5, col=alpha(pointcols,0.4))
 # add point outlines
 points(x=1:nrow(kstat.sort), y=kstat.sort$Swtr, pch=1, col=pointcols, cex=1.7, lwd=1.7)
 
 #dev.off()
 
---- END R CODE FOR PLOTTING INDIVIDUAL AVERAGE RANK-WEIGHTED SKEW DISTRIBUTION ---
+--- end R code for plotting individual average rank-weighted skew distribution ---
 
-## Plots of expected genetic contribution through time to population
+## Plots of expected genetic contribution through time to population - TL TODO
 
 --- begin R code for T and IE temporal contributions to population ---
 
