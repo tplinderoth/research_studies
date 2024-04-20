@@ -178,6 +178,11 @@ h_boxplot2 <- function(x=NULL, n=NULL, lev=grplevels, ylabel="Heterozygosity", p
 }
 
 
+#
+#
+#
+
+
 ## ---------- RAW FASTQ QUALITY CONTROL ---------- ##
 
 ## Assess quality of raw fastq files
@@ -343,6 +348,12 @@ eval $CMD
 
 --- end bash code ---
 
+
+#
+#
+#
+
+
 ## ---------- MAP READS TO REFERENCE GENOME ---------- ##
 
 ## Map clean reads to the FSJ V3 reference genome
@@ -390,6 +401,12 @@ printf "\n%s\n" "$CMD2"
 eval $CMD2
 
 --- end bash code ---
+
+
+#
+#
+#
+
 
 ## ---------- EVALUATE COVERAGE ---------- ##
 
@@ -467,6 +484,12 @@ df$NGS_SEX[which(is.na(df$NGS_SEX) == TRUE)] = "Male"
 # write.table(df,file='/mnt/research/Fitz_Lab/projects/mosaic/map/coverage/ngs_sex_assignment.txt',col.names=TRUE,row.names=FALSE,sep="\t",quote=FALSE)
 
 --- end R code ---
+
+
+#
+#
+#
+
 
 ## ---------- GENETIC VARIANT CALLING ---------- ##
 
@@ -850,6 +873,11 @@ tabix -p vcf $OUTVCF
 --- end bash code ---
 
 
+#
+#
+#
+
+
 ## ---------- RELATEDNESS ESTIMATED FROM GENOMIC DATA ---------- ##
 
 Estimate relatedness among all sequenced individuals.
@@ -1053,6 +1081,12 @@ contemporary CR, n = 6
 resident CR, n = 6
 translocated, n = 8
 
+
+#
+#
+#
+
+
 ## ---------- SITE FREQUENCY SPECTRUM ---------- ##
 
 # Folded SFS calculated from all sites (best SFS estimate, used for estimating genetic diversity)
@@ -1237,6 +1271,12 @@ barplot(res.exp.fold.counts, xlab="Minor allele frequency", names.arg = 1:length
 
 --- end R code ---
 
+
+#
+#
+#
+
+
 ## ---------- FST ---------- ##
 
 FST were calculated using variable sites only
@@ -1312,6 +1352,12 @@ printf "\n%s\n\n" "$CMD"
 eval $CMD
 
 --- end bash code ---
+
+
+#
+#
+#
+
 
 ## ---------- GENETIC DIVERSITY ---------- ##
 
@@ -1401,7 +1447,7 @@ allsites$group = factor(groups,levels=grplevels)
 allsites <- allsites[-which(allsites$V1 == "T_072"),]
 meta <- meta[-which(meta$LAB_ID == "T_072"),]
 
-## H boxplots
+## H boxplots - Figure 3C
 
 # set point type
 pointcode <- meta$popletter
@@ -1565,6 +1611,12 @@ for (g in grps) {
 --- end R code ---
 
 Reported thetas estimated using all contemporary CR and all resident CR individuals in the manuscript.
+
+
+#
+#
+#
+
 
 ## ---------- INBREEDING NGSF ---------- ##
 
@@ -1924,7 +1976,7 @@ wilcox.test(x=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TR
 --- end R code ---
 
 
-## boxplots comparing individual inbreeding estimated with ngsF using population-specific allele frequencies
+## boxplots comparing individual inbreeding estimated with ngsF using population-specific allele frequencies - Figure 3B
 
 --- start R code ---
 
@@ -2034,6 +2086,12 @@ meta$maskcol[which(meta$LAB_ID == "T_067")] <- alpha(meta$popcol[which(meta$LAB_
 h_boxplot_mask(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=fdf$biopoint, seed=1947, color=meta$maskcol, ylim=c(0,0.145))
 
 --- end R code ---
+
+
+#
+#
+#
+
 
 ## ---------- RUNS OF HOMOZYGOSITY (ROH) ---------- ##
 
@@ -2605,7 +2663,7 @@ range(fdf$FROH_BEST[which(fdf$ID %in% trans.all == TRUE)])
 
 --- end R code ---
 
-## Froh boxplots
+## Froh boxplots - Figure S2
 
 --- start R code ---
 
@@ -2658,6 +2716,11 @@ h_boxplot2(x=frohdf, n=2, lev=grplevels, ylabel=expression(Individual~inbreeding
 #dev.off()
 
 --- end R code ---
+
+
+#
+#
+#
 
 
 ## ---------- PRINCIPAL COMPONENT ANALYSIS ---------- ##
@@ -2775,7 +2838,7 @@ for (i in 0:2) {
 
 # The following PCA was used for finalized inferences.
 
-# Plot PC1 vs PC2 with individuals labeled according to biological origin. This is the PCA displayed in the paper.
+# Plot PC1 vs PC2 with individuals labeled according to biological origin. This is the PCA displayed in the paper - Figure 3A
 
 meta$biopoint <- biopoint(meta$pop)
 rswk.idx = which(meta$COLOR_ID == "RSW-K")
@@ -2805,6 +2868,11 @@ text(x=eig$vectors[,1],y=eig$vectors[,2], labels = meta$COLOR_ID, col=meta$popco
 #dev.off()
 
 --- end R code ---
+
+
+#
+#
+#
 
 
 ## ---------- PEDIGREE SKEW ANALYSIS ---------- ##
@@ -3479,103 +3547,11 @@ ylab("Proportion ancestor contribution to population")
 --- end R code for T and IE temporal contributions to population ---
 
 
-Collect information about RLS-K relatives.
-
---- start R code for RLK-S relative assessment ---
-
-rmat <- read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/cr_ped_20230512_relatedness_matrix.txt',head=TRUE)
-rmat[which(colnames(rmat) == "RLS.K"),which(colnames(rmat) == "K.SLA")]
-# [1] 0.125 # r between RLS-K and K-SLA
-
-# find all translocated relatives of RLS-K
-trans <- read.csv('/home/tyler/Dropbox/research/jay/mosaic/metadata/Translocated_Jay_Individual_Statistics.tsv',head=TRUE,sep="\t")
-rlsk.relatives <- colnames(rmat)[which(rmat[which(colnames(rmat) == "RLS.K"),] > 0)]
-trans.id <- gsub("-",".",trans$COLOR_ID)
-rlsk.relatives.trans <- rlsk.relatives[rlsk.relatives %in% trans.id]
-rlsk.relatives.trans <- rlsk.relatives.trans[-which(rlsk.relatives.trans == "RLS.K")]
-rlsk.relatives.trans
-#[1] "SK.RG" "SK.RB" "SK.RP" "SRR.K" "K.SAP" "K.SLA" "K.SPR" "K.SAG"
-
---- end R code for RLS-K relative assessment ---
-
-
-
-## ---------- SKEW ANALYSIS WITH GENOMIC DATA ---------- ##
-
-## Calculate genetic skew (K) statistic for all sequenced translocated and resident individuals with respect to the contemporary sample with --background_r set to the 95th quantile 
-## for relatedness between resident CR and translocated individuals (0.0243058).
-
---- begin R code for subsetting genetic relatedness matrix ---
-
-rmat <- as.matrix(read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix_relateStats_input.txt', head=TRUE))
-idmap <- read.csv('/home/tyler/Dropbox/research/jay/mosaic/metadata/jayid_map_20230512.txt',head=TRUE,sep="\t")
-core <- read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/cr_ped_20230512.tsv',head=TRUE)
-core.anc <- read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/relateStat_inputs/CR_T_IE_ancestors_20230512.txt',head=FALSE) # T, IE
-colnames(rmat) <- toupper(unname(sapply(colnames(rmat),function(x,df){df$COLOR_ID[which(df$LAB_ID == x)]},df=idmap))) # convert relatedness IDs to COLOR_IDs
-idx <- which(colnames(rmat) %in% core$ID)
-rmat.sub <- rmat[idx,idx]
-seq.ids <- colnames(rmat)
-
-# write relatedness matrix containing only Core Region individuals
-write.table(rmat.sub,file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix_relateStats_input_CR.txt',col.names=TRUE,row.names=FALSE,quote=FALSE)
-
-# Make list of sequenced T and IE ancestors and contemporary individuals
-write.table(data.frame(ID=seq.ids[which(seq.ids %in% core.anc$V1)]),file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/CR_T_IE_sequenced.txt',col.names=FALSE,row.names=FALSE,quote=FALSE)
-
---- end R code for subsetting genetic relatedness matrix ---
-
-Calculate skew statistic for CR T and IE individuals
-
---- start bash code ---
-
-./PopGenomicsTools/relateStats --skewstat 3 --rmat fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix_relateStats_input_CR.txt --anc CR_T_IE_sequenced.txt --cohort /home/tyler/Dropbox/research/jay/mosaic/pedigree/relateStat_inputs/CR_sequenced_contemporary_ids_20230512.txt --background_r 0.0243058 --out ./skew/CR_T_IE_to_C_contributions_c0.0243058
-
---- end bash code ---
-
-## Plot of average rank-weighted skew distribution
-
---- begin R code for plotting individual average rank-weighted skew distribution ---
-
-library(scales)
-
-kstat <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/skew/CR_T_IE_to_C_contributions_c0.0243058.skewstat3',head=TRUE)
-meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
-idmap <- read.csv('/home/tyler/Dropbox/research/jay/mosaic/metadata/jayid_map_20230512.txt',head=TRUE,sep="\t")
-meta$popcol <- popcolor(meta)
-meta$COLOR_ID <- unname(sapply(meta$LAB_ID,function(x,df){df$COLOR_ID[which(df$LAB_ID == x)]},df=idmap))
-meta$COLOR_ID[which(meta$COLOR_ID == "*")] <- NA
-
-# nonparametric measure of skew
-npskew = (mean(kstat$Swtr) - median(kstat$Swtr))/sd(kstat$Swtr)
-npskew
-#[1] 0.252958
-
-kstat.sort <- kstat[order(-kstat$Swtr),] # sort data.frame by descending skew statistics
-
-# plot genetic skew statistic, K
-# png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/k_statistic_distribution_v2.png',width=9, height=7, units='in', res=300) # use italics in axis titles
-X11(width=9,height=7)
-par(mar=c(5,5.2,4,2)+0.1)
-plot(x=1:nrow(kstat.sort), y=kstat.sort$Swtr, type="l", lwd=4, col="grey60", ylab = expression(paste("Average weighted relatedness (", italic("K"), ")")), xlab="", xaxt='n',cex.lab=1.6, cex.axis=1.4) # v2
-axis(1, at=1:nrow(kstat.sort), labels=kstat.sort$ID,cex=1.2,las=2)
-# add points
-pointcols = meta$popcol[sapply(kstat.sort$ID,function(x,df){which(df$COLOR_ID == x)},df=meta, USE.NAMES=FALSE)]
-points(x=1:nrow(kstat.sort), y=kstat.sort$Swtr, pch=19, col=alpha(pointcols,0.8), cex=1.7)
-# add vertical bars
-lh = kstat.sort$Swtr
-lines(x=1:nrow(kstat.sort), y=lh, type="h", lwd=13.5, col=alpha(pointcols,0.4))
-# add point outlines
-points(x=1:nrow(kstat.sort), y=kstat.sort$Swtr, pch=1, col=pointcols, cex=1.7, lwd=1.7)
-
-#dev.off()
-
---- end R code for plotting individual average rank-weighted skew distribution ---
-
-########## TL TODO END HERE
-
-## Plots of expected genetic contribution through time to individuals born in a cohort
+## Plot CR ancestor expected genetic contributions through time to individuals born into a cohort
 
 --- begin R code for T and IE temporal contributions to cohort ---
+
+# This code generates Figure S1
 
 library(scales) # for alpha colors
 
@@ -3627,7 +3603,7 @@ colnames(cohort.pmax) <- c("ID",paste0("cohort.",time.periods))
 id.sort <- cohort.pfocal$ID[order(-cohort.pfocal$cohort.2022)] # individuals ordered by contribution in 2022
 cohort.pfocal$rank.2022 <- match(cohort.pfocal$ID,id.sort)
 
-#> id.sort[1:10]
+id.sort[1:10]
 # [1] "RLS-K" "WSA-K" "K-SLA" "OK-RS" "BK-FS" "SK-RG" "SR-PK" "K-RSW" "K-SBF"
 #[10] "BK-LS"
 
@@ -3670,35 +3646,6 @@ cohort.pfocal$lw[which(cohort.pfocal$ID == "BK-AS")] <- 2
 cohort.pfocal$lw[which(cohort.pfocal$ID == "WK-LS")] <- 2
 cohort.pfocal$lw[which(cohort.pfocal$ID == "F-BPS")] <- 2
 
-# set colors for individuals (lines) of interest (top 10 contributors to 2022 cohort) # deprecated
-#cohort.pfocal$color <- "gray30" # use for top 10
-#cohort.pfocal$color <- "black" # use for top 3
-#cohort.pfocal$color[which(cohort.pfocal$ID == "RLS-K")] <- "red"
-#cohort.pfocal$color[which(cohort.pfocal$ID == "WSA-K")] <- "purple"
-#cohort.pfocal$color[which(cohort.pfocal$ID == "K-SLA")] <- "steelblue1" # use for top 3
-#cohort.pfocal$color[which(cohort.pfocal$ID == "K-SLA")] <- "cyan" # use for top 10
-# uncomment individuals below to denote top 10 contributors
-#cohort.pfocal$color[which(cohort.pfocal$ID == "OK-RS")] <- "orange"
-#cohort.pfocal$color[which(cohort.pfocal$ID == "BK-FS")] <- "royalblue1"
-#cohort.pfocal$color[which(cohort.pfocal$ID == "SK-RG")] <- "magenta"
-#cohort.pfocal$color[which(cohort.pfocal$ID == "SR-PK")] <- "red4"
-#cohort.pfocal$color[which(cohort.pfocal$ID == "K-RSW")] <- "turquoise3"
-#cohort.pfocal$color[which(cohort.pfocal$ID == "K-SBF")] <- "palevioletred1"
-#cohort.pfocal$color[which(cohort.pfocal$ID == "BK-LS")] <- "blue"
-
-# set line width # deprecated
-#cohort.pfocal$lw = 1
-#cohort.pfocal$lw[which(cohort.pfocal$ID == "RLS-K")] <- 2
-#cohort.pfocal$lw[which(cohort.pfocal$ID == "WSA-K")] <- 2
-#cohort.pfocal$lw[which(cohort.pfocal$ID == "K-SLA")] <- 2
-# uncomment individuals below to denote top 10 contributors
-#cohort.pfocal$lw[which(cohort.pfocal$ID == "OK-RS")] <- 2
-#cohort.pfocal$lw[which(cohort.pfocal$ID == "BK-FS")] <- 2
-#cohort.pfocal$lw[which(cohort.pfocal$ID == "SK-RG")] <- 2
-#cohort.pfocal$lw[which(cohort.pfocal$ID == "SR-PK")] <- 2
-#cohort.pfocal$lw[which(cohort.pfocal$ID == "K-RSW")] <- 2
-#cohort.pfocal$lw[which(cohort.pfocal$ID == "K-SBF")] <- 2
-#cohort.pfocal$lw[which(cohort.pfocal$ID == "BK-LS")] <- 2
 
 # set line type according to resident vs translocated
 cohort.pfocal$ltype <- unname(sapply(id,function(x,df){df$Biological_Origin_Status}[which(df$COLOR_ID == x)],df=meta))
@@ -3706,12 +3653,9 @@ cohort.pfocal$ltype[which(cohort.pfocal$ltype == "T" | cohort.pfocal$ltype == "D
 cohort.pfocal$ltype[which(cohort.pfocal$ltype == "IE" | cohort.pfocal$ltype == "LR")] <- 2
 cohort.pfocal$ltype <- as.numeric(cohort.pfocal$ltype)
 
-# plot proportion of focal ancestor contributions over time
+# plot focal ancestor contribution proportions over time
 
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/lr_temporal/T_IE_20230512_LR_contributions.pdf', width=16, height=7) #deprecated
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/T_IE_cohort_contribution_pfocal.png',width=16, height=7, units='in', res=300)
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/T_IE_cohort_contribution_pfocal_v2.png',width=16, height=7, units='in', res=300)
-png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/T_IE_cohort_contribution_pfocal_v3.png',width=16, height=7, units='in', res=300)
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/T_IE_cohort_contribution_pfocal_v3.png',width=16, height=7, units='in', res=300)
 x11(width=16,height=7)
 par(mgp = c(2.75,1,0))
 plot(1, type="n", xlim=c(time.periods[1],time.periods[length(time.periods)]), ylim=c(0,max(cohort.pfocal[,tidx],na.rm=TRUE)+0.0),
@@ -3732,253 +3676,120 @@ legend('topright',c("Translocated","Resident"),lty=c(1,2),bty='n',cex=1.3,seg.le
 
 # dev.off()
 
-# proportion with respect to maximum ancestor pop contribution (Hunter normalization) plot
+--- end R code for T and IE temporal contributions to cohort ---
 
-# get ID of top contributors to 2022 cohort
-id.sort.hunter <- cohort.pmax$ID[order(-cohort.pmax$cohort.2022)] # individuals ordered by contribution in 2022
-cohort.pmax$rank.2022 <- match(cohort.pmax$ID,id.sort.hunter)
 
-#> id.sort.hunter[1:10]
-# [1] "BK-LS" "RLS-K" "OK-RS" "K-RSW" "WSA-K" "K-SLA" "BK-AS" "BK-FS" "SK-RG"
-#[10] "WK-LS"
+Collect information about RLS-K relatives.
 
-# set colors for individuals (lines) of interest (top 10 contributors to 2022 cohort)
-cohort.pmax$color <- "gray30"
-cohort.pmax$color[which(cohort.pmax$ID == "BK-LS")] <- "blue"
-cohort.pmax$color[which(cohort.pmax$ID == "RLS-K")] <- "red"
-cohort.pmax$color[which(cohort.pmax$ID == "OK-RS")] <- "orange"
-cohort.pmax$color[which(cohort.pmax$ID == "K-RSW")] <- "turquoise3"
-cohort.pmax$color[which(cohort.pmax$ID == "WSA-K")] <- "purple"
-cohort.pmax$color[which(cohort.pmax$ID == "K-SLA")] <- "cyan"
-cohort.pmax$color[which(cohort.pmax$ID == "BK-AS")] <- "yellow3"
-cohort.pmax$color[which(cohort.pmax$ID == "BK-FS")] <- "royalblue1"
-cohort.pmax$color[which(cohort.pmax$ID == "SK-RG")] <- "magenta"
-cohort.pmax$color[which(cohort.pmax$ID == "WK-LS")] <- "salmon2"
+--- start R code for RLK-S relative assessment ---
 
-# set line width
-cohort.pmax$lw = 1
-cohort.pmax$lw[which(cohort.pmax$ID == "BK-LS")] <- 2
-cohort.pmax$lw[which(cohort.pmax$ID == "RLS-K")] <- 2
-cohort.pmax$lw[which(cohort.pmax$ID == "OK-RS")] <- 2
-cohort.pmax$lw[which(cohort.pmax$ID == "K-RSW")] <- 2
-cohort.pmax$lw[which(cohort.pmax$ID == "WSA-K")] <- 2
-cohort.pmax$lw[which(cohort.pmax$ID == "K-SLA")] <- 2
-cohort.pmax$lw[which(cohort.pmax$ID == "BK-AS")] <- 2
-cohort.pmax$lw[which(cohort.pmax$ID == "BK-FS")] <- 2
-cohort.pmax$lw[which(cohort.pmax$ID == "SK-RG")] <- 2
-cohort.pmax$lw[which(cohort.pmax$ID == "WK-LS")] <- 2
+rmat <- read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/cr_ped_20230512_relatedness_matrix.txt',head=TRUE)
+rmat[which(colnames(rmat) == "RLS.K"),which(colnames(rmat) == "K.SLA")]
+# [1] 0.125 # r between RLS-K and K-SLA
 
-# set line type according to resident vs translocated
-cohort.pmax$ltype <- unname(sapply(id,function(x,df){df$Biological_Origin_Status}[which(df$COLOR_ID == x)],df=meta))
-cohort.pmax$ltype[which(cohort.pmax$ltype == "T" | cohort.pmax$ltype == "Donor_Population")] <- 1
-cohort.pmax$ltype[which(cohort.pmax$ltype == "IE" | cohort.pmax$ltype == "LR")] <- 2
-cohort.pmax$ltype <- as.numeric(cohort.pmax$ltype)
+# find all translocated relatives of RLS-K
+trans <- read.csv('/home/tyler/Dropbox/research/jay/mosaic/metadata/Translocated_Jay_Individual_Statistics.tsv',head=TRUE,sep="\t")
+rlsk.relatives <- colnames(rmat)[which(rmat[which(colnames(rmat) == "RLS.K"),] > 0)]
+trans.id <- gsub("-",".",trans$COLOR_ID)
+rlsk.relatives.trans <- rlsk.relatives[rlsk.relatives %in% trans.id]
+rlsk.relatives.trans <- rlsk.relatives.trans[-which(rlsk.relatives.trans == "RLS.K")]
+rlsk.relatives.trans
+#[1] "SK.RG" "SK.RB" "SK.RP" "SRR.K" "K.SAP" "K.SLA" "K.SPR" "K.SAG"
 
-# plot proportion of focal ancestor contributions over time
+--- end R code for RLS-K relative assessment ---
 
-png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/T_IE_cohort_contribution_pmax.png',width=16, height=7, units='in', res=300)
-x11(width=16,height=7)
-par(mgp = c(2.75,1,0))
-plot(1, type="n", xlim=c(time.periods[1],time.periods[length(time.periods)]), ylim=c(0,max(cohort.pmax[,tidx],na.rm=TRUE)+0.08),
-xlab="Year", ylab="Proportion ancestor contribution relative to pop max", main="",xaxt='n', cex.axis=1.3, cex.lab=1.5)
-axis(side=1,at=time.periods,labels=time.periods,cex=1.5,cex.axis=1.3)
 
-for (i in 1:nrow(cohort.pmax)) {
-	# draw lines
-	lines(x=time.periods, y=cohort.pmax[i,tidx],col=alpha(cohort.pmax$color[i],0.6), lty=cohort.pmax$ltype[i], lwd=cohort.pmax$lw[i])
-}
-# plot mean line
-lines(x=time.periods, y=sapply(tidx,function(x,df){mean(df[,x],na.rm=TRUE)},df=cohort.pmax), lty=6, col="black", lwd=2) # THIS MEAN SHOULD EXCLUDE 0/NA
+#
+#
+#
 
-# add legend
 
-# legend configuration 1
-# legend(x=2019.5, y=0.9,c("Translocated","Resident","Mean"),lty=c(1,2,6),bty='n',cex=1.3,lwd=1.7,seg.len=2.9)
+## ---------- SKEW ANALYSIS WITH GENOMIC DATA ---------- ##
 
-# legend configuration 2
-legend(x=2004, y=1.15,"Translocated",lty=1,bty='n',cex=1.3, lwd=1.7, seg.len=2.9)
-legend(x=2008, y=1.15,"Resident",lty=2,bty='n',cex=1.3, lwd=1.7, seg.len=2.9)
-legend(x=2011.4, y=1.15,"Mean",lty=6,bty='n',cex=1.3, lwd=1.7, seg.len=2.9)
+## Calculate genetic skew (K) statistic for all sequenced translocated and resident individuals with respect to the contemporary sample with --background_r set to the 95th quantile 
+## for relatedness between resident CR and translocated individuals (0.0243058).
+
+--- begin R code for subsetting genetic relatedness matrix ---
+
+rmat <- as.matrix(read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix_relateStats_input.txt', head=TRUE))
+idmap <- read.csv('/home/tyler/Dropbox/research/jay/mosaic/metadata/jayid_map_20230512.txt',head=TRUE,sep="\t")
+core <- read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/cr_ped_20230512.tsv',head=TRUE)
+core.anc <- read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/relateStat_inputs/CR_T_IE_ancestors_20230512.txt',head=FALSE) # T, IE
+colnames(rmat) <- toupper(unname(sapply(colnames(rmat),function(x,df){df$COLOR_ID[which(df$LAB_ID == x)]},df=idmap))) # convert relatedness IDs to COLOR_IDs
+idx <- which(colnames(rmat) %in% core$ID)
+rmat.sub <- rmat[idx,idx]
+seq.ids <- colnames(rmat)
+
+# write relatedness matrix containing only Core Region individuals
+write.table(rmat.sub,file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix_relateStats_input_CR.txt',col.names=TRUE,row.names=FALSE,quote=FALSE)
+
+# Make list of sequenced T and IE ancestors and contemporary individuals
+write.table(data.frame(ID=seq.ids[which(seq.ids %in% core.anc$V1)]),file='/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/CR_T_IE_sequenced.txt',col.names=FALSE,row.names=FALSE,quote=FALSE)
+
+--- end R code for subsetting genetic relatedness matrix ---
+
+Calculate skew statistic for CR T and IE individuals
+
+--- start bash code ---
+
+./PopGenomicsTools/relateStats --skewstat 3 --rmat fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix_relateStats_input_CR.txt --anc CR_T_IE_sequenced.txt --cohort /home/tyler/Dropbox/research/jay/mosaic/pedigree/relateStat_inputs/CR_sequenced_contemporary_ids_20230512.txt --background_r 0.0243058 --out ./skew/CR_T_IE_to_C_contributions_c0.0243058
+
+--- end bash code ---
+
+## Plot of average rank-weighted skew distribution - Figure 4A
+
+--- begin R code for plotting individual average rank-weighted skew distribution ---
+
+library(scales)
+
+kstat <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/skew/CR_T_IE_to_C_contributions_c0.0243058.skewstat3',head=TRUE)
+meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
+idmap <- read.csv('/home/tyler/Dropbox/research/jay/mosaic/metadata/jayid_map_20230512.txt',head=TRUE,sep="\t")
+meta$popcol <- popcolor(meta)
+meta$COLOR_ID <- unname(sapply(meta$LAB_ID,function(x,df){df$COLOR_ID[which(df$LAB_ID == x)]},df=idmap))
+meta$COLOR_ID[which(meta$COLOR_ID == "*")] <- NA
+
+# nonparametric measure of skew
+npskew = (mean(kstat$Swtr) - median(kstat$Swtr))/sd(kstat$Swtr)
+npskew
+#[1] 0.252958
+
+kstat.sort <- kstat[order(-kstat$Swtr),] # sort data.frame by descending skew statistics
+
+# plot genetic skew statistic, K
+# png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/k_statistic_distribution_v2.png',width=9, height=7, units='in', res=300) # use italics in axis titles
+X11(width=9,height=7)
+par(mar=c(5,5.2,4,2)+0.1)
+plot(x=1:nrow(kstat.sort), y=kstat.sort$Swtr, type="l", lwd=4, col="grey60", ylab = expression(paste("Average weighted relatedness (", italic("K"), ")")), xlab="", xaxt='n',cex.lab=1.6, cex.axis=1.4) # v2
+axis(1, at=1:nrow(kstat.sort), labels=kstat.sort$ID,cex=1.2,las=2)
+# add points
+pointcols = meta$popcol[sapply(kstat.sort$ID,function(x,df){which(df$COLOR_ID == x)},df=meta, USE.NAMES=FALSE)]
+points(x=1:nrow(kstat.sort), y=kstat.sort$Swtr, pch=19, col=alpha(pointcols,0.8), cex=1.7)
+# add vertical bars
+lh = kstat.sort$Swtr
+lines(x=1:nrow(kstat.sort), y=lh, type="h", lwd=13.5, col=alpha(pointcols,0.4))
+# add point outlines
+points(x=1:nrow(kstat.sort), y=kstat.sort$Swtr, pch=1, col=pointcols, cex=1.7, lwd=1.7)
 
 #dev.off()
 
---- end R code for T and IE temporal contributions to cohort ---
-
---- begin R code for T, IE, and I temporal contributions to cohort ---
-
-library(scales) # for alpha colors
-
-meta <- read.table("/home/tyler/Dropbox/research/jay/mosaic/metadata/jayid_map_20230512.txt",head=TRUE,sep="\t")
-fdir='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/lr_temporal/'
-ped <- read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/mosaic_ped_20230512.tsv', head=TRUE, na.strings='*')
-
-cohort.n <- NULL # data frame of number of expected genomic copies
-cohort.pfocal <- NULL # data frame of contributions normalized by focal ancestors
-cohort.pmax <- NULL # data frame of contribution normalized by max cohort pop contribution
-
-# read in pedstat files for time points 2004-2022
-time.periods = 2004:2022
-tidx <- 2:(length(time.periods)+1) # these are the contribution columns in matrix
-id <- NULL
-for (t in time.periods) {
-	df <- read.table(paste0(fdir,'T_IE_I_20230512_to_',t,'_LR_contribution.pedstat1'),head=TRUE)
-	if (is.null(id)) id <- df[,1]
-	cohort.n <- cbind(cohort.n, df[,2])
-	cohort.pfocal <- cbind(cohort.pfocal, df[,3])
-	cohort.pmax <- cbind(cohort.pmax, df[,4])
-}
-
-# mask values of individuals if they weren't born
-ped.sub <- ped[which(ped$ID %in% id),c(1,5)]
-ped.sub <- ped.sub[match(id,ped.sub$ID),]
-for (i in 1:length(time.periods)) {
-	t = time.periods[i]
-	idx <- which(ped.sub$COHORT > t)
-	if (length(idx) > 0) {
-		cohort.n[idx,i] <- NA
-		cohort.pfocal[idx,i] <- NA
-		cohort.pmax[idx,i] <- NA	
-	}
-}
-
-cohort.n <- cbind(data.frame(ID=id),as.data.frame(cohort.n)) # add sample names
-colnames(cohort.n) <- c("ID",paste0("cohort.",time.periods))
-
-cohort.pfocal <- cbind(data.frame(ID=id),as.data.frame(cohort.pfocal)) # add sample names
-colnames(cohort.pfocal) <- c("ID",paste0("cohort.",time.periods))
-
-cohort.pmax <- cbind(data.frame(ID=id),as.data.frame(cohort.pmax)) # add sample names
-colnames(cohort.pmax) <- c("ID",paste0("cohort.",time.periods))
-
-# proportion with respect to focal ancestors plot
-
-# get ID of top contributors to 2022 cohort
-id.sort <- cohort.pfocal$ID[order(-cohort.pfocal$cohort.2022)] # individuals ordered by contribution in 2022
-cohort.pfocal$rank.2022 <- match(cohort.pfocal$ID,id.sort)
-
-# set colors for individuals (lines) of interest (top 10 contributors to 2022 cohort)
-cohort.pfocal$color <- "gray30"
-cohort.pfocal$color[which(cohort.pfocal$ID == "RLS-K")] <- "red"
-cohort.pfocal$color[which(cohort.pfocal$ID == "WSA-K")] <- "purple"
-cohort.pfocal$color[which(cohort.pfocal$ID == "K-SLA")] <- "cyan"
-cohort.pfocal$color[which(cohort.pfocal$ID == "PF-SH")] <- "darkcyan"
-cohort.pfocal$color[which(cohort.pfocal$ID == "PK-SG")] <- "cornflowerblue"
-cohort.pfocal$color[which(cohort.pfocal$ID == "OK-RS")] <- "orange"
-cohort.pfocal$color[which(cohort.pfocal$ID == "BK-FS")] <- "royalblue1"
-cohort.pfocal$color[which(cohort.pfocal$ID == "SK-RG")] <- "magenta"
-cohort.pfocal$color[which(cohort.pfocal$ID == "GF-SG")] <- "royalblue4"
-cohort.pfocal$color[which(cohort.pfocal$ID == "SR-PK")] <- "red4"
+--- end R code for plotting individual average rank-weighted skew distribution ---
 
 
-# set line type according to resident vs translocated
-cohort.pfocal$ltype <- unname(sapply(id,function(x,df){df$Biological_Origin_Status}[which(df$COLOR_ID == x)],df=meta))
-cohort.pfocal$ltype[which(cohort.pfocal$ltype == "T" | cohort.pfocal$ltype == "Donor_Population")] <- 1
-cohort.pfocal$ltype[which(cohort.pfocal$ltype == "IE" | cohort.pfocal$ltype == "LR")] <- 2
-cohort.pfocal$ltype[which(cohort.pfocal$ltype == "I")] <- 3
-cohort.pfocal$ltype <- as.numeric(cohort.pfocal$ltype)
+#
+#
+#
 
-# set line width
-cohort.pfocal$lw = 1
-cohort.pfocal$lw[which(cohort.pfocal$ltype == 3)] <- 1.8 # need to increase size of dots for visibility
-isize=2.8
-cohort.pfocal$lw[which(cohort.pfocal$ID == "RLS-K")] <- 1.8
-cohort.pfocal$lw[which(cohort.pfocal$ID == "WSA-K")] <- 1.8
-cohort.pfocal$lw[which(cohort.pfocal$ID == "K-SLA")] <- 1.8
-cohort.pfocal$lw[which(cohort.pfocal$ID == "PF-SH")] <- isize # immigrant
-cohort.pfocal$lw[which(cohort.pfocal$ID == "PK-SG")] <- isize # immigrant
-cohort.pfocal$lw[which(cohort.pfocal$ID == "OK-RS")] <- 1.8
-cohort.pfocal$lw[which(cohort.pfocal$ID == "BK-FS")] <- 1.8
-cohort.pfocal$lw[which(cohort.pfocal$ID == "SK-RG")] <- 1.8
-cohort.pfocal$lw[which(cohort.pfocal$ID == "GF-SG")] <- isize # immigrant
-cohort.pfocal$lw[which(cohort.pfocal$ID == "SR-PK")] <- 1.8
 
-# plot proportion of focal ancestor contributions over time
+## ---------- COMPARE PEDIGREE VS GENOMIC-BASED SKEW INFERENCE ---------- ##
 
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/lr_temporal/T_IE_I_20230512_LR_cohort_contributions.pdf', width=16, height=7)
-x11(width=16,height=7)
-par(mgp = c(2.75,1,0))
-plot(1, type="n", xlim=c(time.periods[1],time.periods[length(time.periods)]), ylim=c(0,max(cohort.pfocal[,tidx],na.rm=TRUE)+0.05),
-xlab="Year", ylab="Proportion ancestor contribution to cohort", main="",xaxt='n', cex.axis=1.3, cex.lab=1.5)
-axis(side=1,at=time.periods,labels=time.periods,cex=1.5,cex.axis=1.3)
+## Examine correlation between expected genetic contributions calculated from the pedigree and the K statistic 
+## calculated from genomic data.
 
-for (i in 1:nrow(cohort.pfocal)) {
-	# draw lines
-	lines(x=time.periods, y=cohort.pfocal[i,tidx],col=alpha(cohort.pfocal$color[i],0.6), lty=cohort.pfocal$ltype[i], lwd=cohort.pfocal$lw[i])
-}
-# plot mean line
-lines(x=time.periods, y=sapply(tidx,function(x,df){mean(df[,x],na.rm=TRUE)},df=cohort.pfocal), lty=6, col="black", lwd=1.8)
+--- begin R code for comparing skew inference approaches ---
 
-# add legend
-legend('topright',c("Translocated","Resident","Immigrant","Mean"),lty=c(1,2,3,6),bty='n',cex=1.2)
+library(scales)
 
-# proportion with respect to maximum ancestor pop contribution (Hunter normalization) plot
-
-# get ID of top contributors to 2022 cohort
-id.sort.hunter <- cohort.pmax$ID[order(-cohort.pmax$cohort.2022)] # individuals ordered by contribution in 2022
-cohort.pmax$rank.2022 <- match(cohort.pmax$ID,id.sort.hunter)
-
-# set colors for individuals (lines) of interest (top 10 contributors to 2022 cohort)
-cohort.pmax$color <- "gray30"
-cohort.pmax$color[which(cohort.pmax$ID == "RLS-K")] <- "red"
-cohort.pmax$color[which(cohort.pmax$ID == "WSA-K")] <- "purple"
-cohort.pmax$color[which(cohort.pmax$ID == "OK-RS")] <- "orange"
-cohort.pmax$color[which(cohort.pmax$ID == "K-SLA")] <- "cyan"
-cohort.pmax$color[which(cohort.pmax$ID == "BK-FS")] <- "royalblue1"
-cohort.pmax$color[which(cohort.pmax$ID == "SK-RG")] <- "magenta"
-cohort.pmax$color[which(cohort.pmax$ID == "BK-LS")] <- "blue"
-cohort.pmax$color[which(cohort.pmax$ID == "SR-PK")] <- "red4"
-cohort.pmax$color[which(cohort.pmax$ID == "WK-LS")] <- "salmon2"
-cohort.pmax$color[which(cohort.pmax$ID == "K-RSW")] <- "turquoise3"
-
-# set line type according to resident vs translocated
-cohort.pmax$ltype <- unname(sapply(id,function(x,df){df$Biological_Origin_Status}[which(df$COLOR_ID == x)],df=meta))
-cohort.pmax$ltype[which(cohort.pmax$ltype == "T" | cohort.pmax$ltype == "Donor_Population")] <- 1
-cohort.pmax$ltype[which(cohort.pmax$ltype == "IE" | cohort.pmax$ltype == "LR")] <- 2
-cohort.pmax$ltype[which(cohort.pmax$ltype == "I")] <- 3
-cohort.pmax$ltype <- as.numeric(cohort.pmax$ltype)
-
-# set line width
-cohort.pmax$lw = 1
-cohort.pmax$lw[which(cohort.pmax$ltype == 3)] <- 1.8 # need to increase size of dots for visibility
-cohort.pmax$lw[which(cohort.pmax$ID == "RLS-K")] <- 1.8
-cohort.pmax$lw[which(cohort.pmax$ID == "WSA-K")] <- 1.8
-cohort.pmax$lw[which(cohort.pmax$ID == "OK-RS")] <- 1.8
-cohort.pmax$lw[which(cohort.pmax$ID == "K-SLA")] <- 1.8
-cohort.pmax$lw[which(cohort.pmax$ID == "BK-FS")] <- 1.8
-cohort.pmax$lw[which(cohort.pmax$ID == "SK-RG")] <- 1.8
-cohort.pmax$lw[which(cohort.pmax$ID == "BK-LS")] <- 1.8
-cohort.pmax$lw[which(cohort.pmax$ID == "SR-PK")] <- 1.8
-cohort.pmax$lw[which(cohort.pmax$ID == "WK-LS")] <- 1.8
-cohort.pmax$lw[which(cohort.pmax$ID == "K-RSW")] <- 1.8
-
-# plot proportion of focal ancestor contributions over time
-
-x11(width=16,height=7)
-par(mgp = c(2.75,1,0))
-plot(1, type="n", xlim=c(time.periods[1],time.periods[length(time.periods)]), ylim=c(0,max(cohort.pmax[,tidx],na.rm=TRUE)+0.05),
-xlab="Year", ylab="Proportion ancestor contribution relative to pop max", main="",xaxt='n', cex.axis=1.3, cex.lab=1.5)
-axis(side=1,at=time.periods,labels=time.periods,cex=1.5,cex.axis=1.3)
-
-for (i in 1:nrow(cohort.pmax)) {
-	# draw lines
-	lines(x=time.periods, y=cohort.pmax[i,tidx],col=alpha(cohort.pmax$color[i],0.6), lty=cohort.pmax$ltype[i], lwd=cohort.pmax$lw[i])
-}
-# plot mean line
-lines(x=time.periods, y=sapply(tidx,function(x,df){mean(df[,x],na.rm=TRUE)},df=cohort.pmax), lty=6, col="black", lwd=1.8)
-
-# add legend
-legend('topright',c("Translocated","Resident","Immigrant","Mean"),lty=c(1,2,3,6),bty='n',cex=1.2)
-
---- end R code for T, IE, and I temporal contributions to cohort ---
-
-### COMPARE PEDIGREE VS GENOMIC-BASED CONTRIBUTIONS
-
-workdir='/home/tyler/Dropbox/research/jay/mosaic/pedigree/contribution'
-
---- begin R code for comparing contributions ---
-
-#gendat <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/skew/T_E_I_M4_to_contemporary_contributions_c0.0243058.skewstat3',head=TRUE)
-#ped1 <- read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/sequenced_contemporary/T_IE_I_20230512_to_seq_contemporary.pedstat1',head=TRUE)
 ped1 <- read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/sequenced_contemporary/T_IE_20230512_to_seq_contemporary.pedstat1',head=TRUE)
 gendat <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/skew/CR_T_IE_to_C_contributions_c0.0243058.skewstat3',head=TRUE)
 genmeta <- read.table('~/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE)
@@ -4016,14 +3827,14 @@ ped1.sort$Swtr = unname(sapply(ped1.sort$ID,function(x,df){ifelse(is.na(x),NA,df
 #		   ped.rank = NA, gen.rank = gendat.sort$swtr.rank[idx], Swtr = gendat.sort$Swtr[idx]))
 #	}
 #}
-
 #ped1.sort <- rbind(ped1.sort, m4_missing)
 
 # subset of ancestors in pedigree and genetic analysis
 share <- ped1.sort[which(!is.na(ped1.sort$ped.rank) & !is.na(ped1.sort$gen.rank)),]
 
-# test for correlation between K statistic and the the number of genomic copies for individuals common to both datasets
-> cor.test(x=share$Swtr, y=share$N_GENOME_COPIES, method="kendall")
+## test for correlation between K statistic and the the number of genomic copies for individuals common to both datasets
+
+cor.test(x=share$Swtr, y=share$N_GENOME_COPIES, method="kendall", alternative="two.sided")
 #
 #	Kendall's rank correlation tau
 #
@@ -4035,10 +3846,10 @@ share <- ped1.sort[which(!is.na(ped1.sort$ped.rank) & !is.na(ped1.sort$gen.rank)
 #0.4194696 
 #
 #Warning message:
-#In cor.test.default(x = share$Swtr, y = share$N_GENOME_COPIES, method = "kendall") :
+#In cor.test.default(x = share$Swtr, y = share$N_GENOME_COPIES, method = "kendall",  
 #  Cannot compute exact p-value with ties
 
-# line plot
+## line plot - Figure 4B
 
 library(scales)
 
@@ -4061,7 +3872,6 @@ pedcol <- alpha(ped1.sort$biotype_col,0.65)
 pedcol[which(ped1.sort$ped.rank >= ped.cutoff)] <- alpha("grey40",0.65)
 
 gencol.bg <- alpha(ped1.sort$biotype_col,0.65)
-#gencol.bg[which(is.na(ped1.sort$ped.rank))] <- alpha("grey40",0) # makes totally tranparent (i.e. no colored background)
 gencol.bg[which(ped1.sort$gen.rank >= gen.cutoff)] <- alpha("grey40",0)
 
 gencol <- alpha(ped1.sort$biotype_col,0.65)
@@ -4118,7 +3928,6 @@ for (i in urank.gen) {
 
 
 # make canvas and plot
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/sequenced_contemporary/pedigree_vs_genetic_skew_rank.pdf') #deprecated
 #png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/ped_vs_genetic_skew_comparison.png',width=6, height=7, units='in', res=300)
 
 x11(width=6,height=7)
@@ -4152,258 +3961,25 @@ legend('bottomleft',c("Resident","Translocated", "No contribution"),pch=21,col=c
 #dev.off()
 
 # print top ten contributors based on pedigree
-#ped1.sort$ID[order(ped1.sort$ped.rank)][1:10]
+ped1.sort$ID[order(ped1.sort$ped.rank)][1:10]
 # [1] "RLS-K" "WSA-K" "OK-RS" "K-SLA" "K-RSW" "SK-RG" "BK-FS" "SR-PK" "F-BPS"
 #[10] "BK-LS"
 
 
-# print top ten contributors based on genetic (k-statistic) analysis
-#> ped1.sort$ID[order(ped1.sort$gen.rank)][1:10]
+# print top ten contributors based on genetic (K statistic) analysis
+ped1.sort$ID[order(ped1.sort$gen.rank)][1:10]
 # [1] "WSA-K" "K-RSW" "GK-YS" "SR-PK" "K-SBF" "K-SLA" "SK-WB" "K-SAG" "RK-YS"
 #[10] "BK-FS"
 
---- end R code for comparing contributions ---
-
---- begin R code for comparing temporal contributions by ancestral type (translocated or resident) ---
-
-meta <- read.table("/home/tyler/Dropbox/research/jay/mosaic/metadata/jayid_map_20230512.txt",head=TRUE,sep="\t")
-popdir='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/pop_temporal/'
-lrdir='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/lr_temporal/'
-ped <- read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/mosaic_ped_20230512.tsv', head=TRUE, na.strings='*')
-
-pop.n <- NULL # data frame of number of expected genomic copies in population
-cohort.n <- NULL # data frame of number of expecteed genomic copies
-
-# read in pedstat files for time points 2002-2022
-time.periods = 2002:2022
-tidx <- 2:(length(time.periods)+1) # these are the contribution columns in matrix
-id <- NULL
-n.anc = 76
-for (t in time.periods) {
-	fname.pop = paste0(popdir,'T_IE_20230512_',t,'_pop_contribution.pedstat1')
-	if (file.exists(fname.pop)) {
-		df <- read.table(fname.pop,head=TRUE)
-		if (is.null(id)) id <- df[,1]
-		pop.n <- cbind(pop.n, df[,2])
-	} else pop.n <- cbind(pop.n,rep(NA,n.anc))
-
-	fname.lr = paste0(lrdir,'T_IE_20230512_to_',t,'_LR_contribution.pedstat1')
-	if (file.exists(fname.lr)) {
-		df <- read.table(fname.lr,head=TRUE)
-		if (is.null(id)) id <- df[,1]
-		cohort.n <- cbind(cohort.n, df[,2])
-	} else cohort.n <- cbind(cohort.n,rep(NA,n.anc))
-}
-
-# mask values of individuals if they weren't born
-ped.sub <- ped[which(ped$ID %in% id),c(1,5)]
-ped.sub <- ped.sub[match(id,ped.sub$ID),]
-for (i in 1:length(time.periods)) {
-	t = time.periods[i]
-	idx <- which(ped.sub$COHORT > t)
-	if (length(idx) > 0) {
-		pop.n[idx,i] <- NA
-		cohort.n[idx,i] <- NA
-	}
-}
+--- end R code for comparing skew inference approaches ---
 
 
-# collect biological origin info
-meta.sub <- meta[which(meta$COLOR_ID %in% id),]
-meta.sub <- meta.sub[match(id, meta.sub$COLOR_ID),]
-biotype <- replace(meta.sub$Biological_Origin_Status, which(meta.sub$Biological_Origin_Status == "Donor_Population"), "T")
-biotype <- replace(biotype, which(biotype == "IE" | biotype == "LR"), "R")
-
-# add annotations
-pop.n <- cbind(data.frame(ID=id, BIOTYPE=biotype),as.data.frame(pop.n)) # add sample names
-colnames(pop.n) <- c("ID","BIOTYPE",paste0("cohort.",time.periods))
-
-cohort.n <- cbind(data.frame(ID=id, BIOTYPE=biotype),as.data.frame(cohort.n)) # add sample names
-colnames(cohort.n) <- c("ID","BIOTYPE",paste0("cohort.",time.periods))
-
-# make biotype data.frame of proportions
-r.idx = which(biotype=="R")
-t.idx = which(biotype=="T")
-pop.p <- NULL # dataframe of contribution by Resident vs translocated to population
-cohort.p <- NULL # dataframe of contribution by Resident vs translocated to cohort
-
-for (i in 3:ncol(pop.n)) {
-	total.copies = sum(pop.n[,i],na.rm=TRUE)
-	res.copies = sum(pop.n[r.idx,i],na.rm=TRUE)
-	trans.copies = sum(pop.n[t.idx,i],na.rm=TRUE)
-	if (total.copies > 0) {
-		res.p = res.copies/total.copies
-		trans.p = trans.copies/total.copies
-	} else {
-		res.p = NA
-		trans.p = NA	
-	}
-	pop.p <- rbind(pop.p, data.frame(YEAR=time.periods[i-2], RESIDENT=res.p, TRANSLOCATED=trans.p))
-
-	total.copies.cohort = sum(cohort.n[,i],na.rm=TRUE)
-	res.copies.cohort = sum(cohort.n[r.idx,i],na.rm=TRUE)
-	trans.copies.cohort = sum(cohort.n[t.idx,i],na.rm=TRUE)
-	if (total.copies.cohort > 0) {
-		res.p.cohort = res.copies.cohort/total.copies.cohort
-		trans.p.cohort = trans.copies.cohort/total.copies.cohort
-	} else {
-		res.p.cohort = NA
-		trans.p.cohort = NA	
-	}
-	cohort.p <- rbind(cohort.p, data.frame(YEAR=time.periods[i-2], RESIDENT=res.p.cohort, TRANSLOCATED=trans.p.cohort))
-}
-
-# plot proportions over time
-
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/figures/pedigree_biotype_temporal_contributions.pdf', width=16, height=7)
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/figures/pedigree_biotype_temporal_contributions.png', width=16, height=7, units='in', res=300)
-x11(width=16,height=7)
-par(mgp = c(2.75,1,0))
-plot(1, type="n", xlim=c(time.periods[1],time.periods[length(time.periods)]), ylim=c(0,1),
-xlab="Year", ylab="Expected genetic contribution proportion", main="",xaxt='n', cex.axis=1.3, cex.lab=1.5)
-axis(side=1,at=time.periods,labels=time.periods,cex=1.5,cex.axis=1.3)
-
-lines(x=pop.p$YEAR, y=pop.p$RESIDENT, col="plum3", lwd=3, lty=1) # resident contribution to population
-lines(x=pop.p$YEAR, y=pop.p$TRANSLOCATED, col="black", lwd=3, lty=1) # translocated contribution to population
-lines(x=cohort.p$YEAR, y=cohort.p$RESIDENT, col="plum3", lwd=3, lty=2) # resident contribution to cohort
-lines(x=cohort.p$YEAR, y=cohort.p$TRANSLOCATED, col="black", lwd=3, lty=2) # translocated contribution to cohort
-
-# add legend
-
-legend(x=2003,y=1.05, "Resident to population", col="plum3", lty=1, lwd=3, bty='n', cex=1.1)
-legend(x=2007.5,y=1.05, "Resident to cohort", col="plum3", lty=2, lwd=3, bty='n', cex=1.1)
-legend(x=2011.5,y=1.05, "Translocated to population", col="black", lty=1, lwd=3, bty='n', cex=1.1)
-legend(x=2016.5,y=1.05, "Translocated to cohort", col="black", lty=2, lwd=3, bty='n', cex=1.1)
-
-#dev.off()
-
---- end R code for comparing temporal contributions by ancestral type (translocated or resident) ---
-
---- begin R code for comparing temporal contributions by ancestral type (translocated, resident, immigrant) ---
-
-meta <- read.table("/home/tyler/Dropbox/research/jay/mosaic/metadata/jayid_map_20230512.txt",head=TRUE,sep="\t")
-popdir='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/pop_temporal/'
-lrdir='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/lr_temporal/'
-ped <- read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/mosaic_ped_20230512.tsv', head=TRUE, na.strings='*')
-
-pop.n <- NULL # data frame of number of expected genomic copies in population
-cohort.n <- NULL # data frame of number of expecteed genomic copies
-
-# read in pedstat files for time points 2002-2022
-time.periods = 2002:2022
-tidx <- 2:(length(time.periods)+1) # these are the contribution columns in matrix
-id <- NULL
-n.anc = 131
-for (t in time.periods) {
-	fname.pop = paste0(popdir,'T_IE_I_20230512_',t,'_pop_contribution.pedstat1')
-	if (file.exists(fname.pop)) {
-		df <- read.table(fname.pop,head=TRUE)
-		if (is.null(id)) id <- df[,1]
-		pop.n <- cbind(pop.n, df[,2])
-	} else pop.n <- cbind(pop.n,rep(NA,n.anc))
-
-	fname.lr = paste0(lrdir,'T_IE_I_20230512_to_',t,'_LR_contribution.pedstat1')
-	if (file.exists(fname.lr)) {
-		df <- read.table(fname.lr,head=TRUE)
-		if (is.null(id)) id <- df[,1]
-		cohort.n <- cbind(cohort.n, df[,2])
-	} else cohort.n <- cbind(cohort.n,rep(NA,n.anc))
-}
-
-# mask values of individuals if they weren't born
-ped.sub <- ped[which(ped$ID %in% id),c(1,5)]
-ped.sub <- ped.sub[match(id,ped.sub$ID),]
-for (i in 1:length(time.periods)) {
-	t = time.periods[i]
-	idx <- which(ped.sub$COHORT > t)
-	if (length(idx) > 0) {
-		pop.n[idx,i] <- NA
-		cohort.n[idx,i] <- NA
-	}
-}
+#
+#
+#
 
 
-# collect biological origin info
-meta.sub <- meta[which(meta$COLOR_ID %in% id),]
-meta.sub <- meta.sub[match(id, meta.sub$COLOR_ID),]
-biotype <- replace(meta.sub$Biological_Origin_Status, which(meta.sub$Biological_Origin_Status == "Donor_Population"), "T")
-biotype <- replace(biotype, which(biotype == "IE" | biotype == "LR"), "R")
-
-# add annotations
-pop.n <- cbind(data.frame(ID=id, BIOTYPE=biotype),as.data.frame(pop.n)) # add sample names
-colnames(pop.n) <- c("ID","BIOTYPE",paste0("cohort.",time.periods))
-
-cohort.n <- cbind(data.frame(ID=id, BIOTYPE=biotype),as.data.frame(cohort.n)) # add sample names
-colnames(cohort.n) <- c("ID","BIOTYPE",paste0("cohort.",time.periods))
-
-# make biotype data.frame of proportions
-r.idx = which(biotype=="R")
-t.idx = which(biotype=="T")
-i.idx = which(biotype=="I")
-pop.p <- NULL # dataframe of contribution by Resident vs translocated vs immigrant to population
-cohort.p <- NULL # dataframe of contribution by Resident vs translocated vs immigrant to cohort
-
-for (i in 3:ncol(pop.n)) {
-	total.copies = sum(pop.n[,i],na.rm=TRUE)
-	res.copies = sum(pop.n[r.idx,i],na.rm=TRUE)
-	trans.copies = sum(pop.n[t.idx,i],na.rm=TRUE)
-	immi.copies = sum(pop.n[i.idx,i],na.rm=TRUE)
-	if (total.copies > 0) {
-		res.p = res.copies/total.copies
-		trans.p = trans.copies/total.copies
-		immi.p = immi.copies/total.copies
-	} else {
-		res.p = NA
-		trans.p = NA
-		immi.p = NA
-	}
-	pop.p <- rbind(pop.p, data.frame(YEAR=time.periods[i-2], RESIDENT=res.p, TRANSLOCATED=trans.p, IMMIGRANT=immi.p))
-
-	total.copies.cohort = sum(cohort.n[,i],na.rm=TRUE)
-	res.copies.cohort = sum(cohort.n[r.idx,i],na.rm=TRUE)
-	trans.copies.cohort = sum(cohort.n[t.idx,i],na.rm=TRUE)
-	immi.copies.cohort = sum(cohort.n[i.idx,i],na.rm=TRUE)
-	if (total.copies.cohort > 0) {
-		res.p.cohort = res.copies.cohort/total.copies.cohort
-		trans.p.cohort = trans.copies.cohort/total.copies.cohort
-		immi.p.cohort = immi.copies.cohort/total.copies.cohort
-	} else {
-		res.p.cohort = NA
-		trans.p.cohort = NA
-		immi.p.cohort = NA
-	}
-	cohort.p <- rbind(cohort.p, data.frame(YEAR=time.periods[i-2], RESIDENT=res.p.cohort, TRANSLOCATED=trans.p.cohort, IMMIGRANT=immi.p.cohort))
-}
-
-# plot proportions over time
-
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/figures/pedigree_biotype_temporal_contributions_T_IE_I.pdf', width=16, height=7)
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/figures/pedigree_biotype_temporal_contributions_T_IE_I.png', width=16, height=7, units='in', res=300)
-x11(width=16,height=7)
-par(mgp = c(2.75,1,0))
-plot(1, type="n", xlim=c(time.periods[1],time.periods[length(time.periods)]), ylim=c(0,1),
-xlab="Year", ylab="Expected genetic contribution proportion", main="",xaxt='n', cex.axis=1.3, cex.lab=1.5)
-axis(side=1,at=time.periods,labels=time.periods,cex=1.5,cex.axis=1.3)
-
-lines(x=pop.p$YEAR, y=pop.p$RESIDENT, col="plum3", lwd=3, lty=1) # resident contribution to population
-lines(x=pop.p$YEAR, y=pop.p$TRANSLOCATED, col="black", lwd=3, lty=1) # translocated contribution to population
-lines(x=pop.p$YEAR, y=pop.p$IMMIGRANT, col="paleturquoise3", lwd=3, lty=1) # immigrant contribution to population
-lines(x=cohort.p$YEAR, y=cohort.p$RESIDENT, col="plum3", lwd=3, lty=2) # resident contribution to cohort
-lines(x=cohort.p$YEAR, y=cohort.p$TRANSLOCATED, col="black", lwd=3, lty=2) # translocated contribution to cohort
-lines(x=cohort.p$YEAR, y=cohort.p$IMMIGRANT, col="paleturquoise3", lwd=3, lty=2) # immigrant contribution to cohort
-
-# add legend
-
-legend(x=2014.5,y=1.05, "Resident to population", col="plum3", lty=1, lwd=3, bty='n', cex=1.1)
-legend(x=2019,y=1.05, "Resident to cohort", col="plum3", lty=2, lwd=3, bty='n', cex=1.1)
-legend(x=2014.5,y=1, "Translocated to population", col="black", lty=1, lwd=3, bty='n', cex=1.1)
-legend(x=2019,y=1, "Translocated to cohort", col="black", lty=2, lwd=3, bty='n', cex=1.1)
-legend(x=2014.5,y=0.95, "Immigrant to population", col="paleturquoise3", lty=1, lwd=3, bty='n', cex=1.1)
-legend(x=2019,y=0.95, "Immigrant to cohort", col="paleturquoise3", lty=2, lwd=3, bty='n', cex=1.1)
-
-#dev.off()
-
---- end R code for comparing temporal contributions by ancestral type (translocated, resident, immigrant) ---
+## ---------- DEMOGRAPHIC SIZE CHANGE ---------- ##
 
 --- begin R code for number of T and IE contributing to each cohort and demographic expansion ---
 
