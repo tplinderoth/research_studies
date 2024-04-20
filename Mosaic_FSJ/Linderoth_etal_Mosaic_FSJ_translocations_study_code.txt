@@ -2970,6 +2970,7 @@ for (i in min(lr$YEAR_CLASS,na.rm=TRUE):max(lr$YEAR_CLASS,na.rm=TRUE)){
 
 --- end R code for making relateStats inputs ---
 
+
 NOTE: All of the following samples (except RSW-K) considered residents in the genetic analyses were missing among the T, IE, and I ancestors so 
 were manually added to the ancestors list file: /home/tyler/Dropbox/research/jay/mosaic/pedigree/relateStat_inputs/CR_T_IE_ancestors_20230512.txt.
 
@@ -2996,6 +2997,7 @@ for i in {2002..2022}; do echo "$i"; ~/code_projects/PopGenomicsTools/relateStat
 
 --- end bash code ---
 
+
 Calculate contribution of T and IE ancestors to local recruits born in 2004 (first local recruit) to 2022 (latest local recruit cohort).
 
 --- start bash code ---
@@ -3004,6 +3006,7 @@ for i in {2004..2022}; do COHORT_FILE="./relateStat_inputs/CR_LR_ids_20230512_${
 
 --- end bash code ---
 
+
 Calculate contribution of T and IE ancestors to sequenced contemporary individuals.
 
 --- start bash code ---
@@ -3011,6 +3014,491 @@ Calculate contribution of T and IE ancestors to sequenced contemporary individua
 $ ~/code_projects/PopGenomicsTools/relateStats --pedstat 1 --ped cr_ped_20230512.tsv --rmat cr_ped_20230512_relatedness_matrix.txt --anc ./relateStat_inputs/CR_T_IE_ancestors_20230512.txt --cohort ./relateStat_inputs/CR_sequenced_contemporary_ids_20230512.txt --draw --out ./results/sequenced_contemporary/T_IE_20230512_to_seq_contemporary 2> ./results/sequenced_contemporary/T_IE_20230512_to_seq_contemporary.log
 
 --- end bash code ---
+
+
+## Plots of expected genetic contribution by CR ancestors to CR population through time
+
+--- begin R code for T and IE temporal contributions to population ---
+
+library(scales) # for alpha colors
+library(ggplot2)
+library(ggpattern)
+
+meta <- read.table("/home/tyler/Dropbox/research/jay/mosaic/metadata/jayid_map_20230512.txt",head=TRUE,sep="\t")
+fdir='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/pop_temporal/'
+ped <- read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/cr_ped_20230512.tsv', head=TRUE, na.strings='*')
+
+pop.n <- NULL # data frame of number of expected genomic copies
+pop.pfocal <- NULL # data frame of contributions normalized by focal ancestors
+pop.pmax <- NULL # data frame of contribution normalized by max cohort pop contribution
+
+# read in pedstat files for time points 2002-2022
+
+time.periods = 2002:2022
+
+# subset time periods for plots that follow so that they span years 2003-2022 (exclude 2002)
+time.periods2 <- time.periods[2:length(time.periods)]
+
+tidx <- 2:(length(time.periods)+1) # these are the contribution columns in matrix
+id <- NULL
+for (t in time.periods) {
+	df <- read.table(paste0(fdir,'T_IE_20230512_',t,'_pop_contribution.pedstat1'),head=TRUE)
+	if (is.null(id)) id <- df[,1]
+	pop.n <- cbind(pop.n, df[,2])
+	pop.pfocal <- cbind(pop.pfocal, df[,3])
+	pop.pmax <- cbind(pop.pmax, df[,4])
+}
+
+# mask values of individuals if they weren't born
+ped.sub <- ped[which(ped$ID %in% id),c(1,5)]
+ped.sub <- ped.sub[match(id,ped.sub$ID),]
+for (i in 1:length(time.periods)) {
+	t = time.periods[i]
+	idx <- which(ped.sub$COHORT > t)
+	if (length(idx) > 0) {
+		pop.n[idx,i] <- NA
+		pop.pfocal[idx,i] <- NA
+		pop.pmax[idx,i] <- NA	
+	}
+}
+
+# NOTE: Recalculating proportions here such that they sum to 1 because KRS- and SR-PK sired translocated individuals
+# prior to arriving in the Wellfield in 2005 and 2009, respectively. Counting contributions AFTER existing in 
+# the CR makes the total contribution of ancestors <1. Therefore, resumming to count only the contributions
+# of individuals after they arrive in the CR (after masking has been applied). Total ancestor contribution will now be 1.
+
+for (i in 1:ncol(pop.pfocal)) {
+	pop.pfocal[,i] <- pop.pfocal[,i]/sum(pop.pfocal[,i], na.rm=TRUE)
+}
+
+#
+#
+
+pop.n <- cbind(data.frame(ID=id),as.data.frame(pop.n)) # add sample names
+colnames(pop.n) <- c("ID",paste0("cohort.",time.periods))
+
+pop.pfocal <- cbind(data.frame(ID=id),as.data.frame(pop.pfocal)) # add sample names
+colnames(pop.pfocal) <- c("ID",paste0("cohort.",time.periods))
+
+pop.pmax <- cbind(data.frame(ID=id),as.data.frame(pop.pmax)) # add sample names
+colnames(pop.pmax) <- c("ID",paste0("cohort.",time.periods))
+
+## Descriptions of the genetic contribtuion of ancestors to the CR population
+
+anc.contributors <- NULL
+for (i in 1:length(time.periods)) {
+	j <- i+1
+	nexist <- length(which(!is.na(pop.pfocal[,j])))
+	n <- length(which(pop.pfocal[,j] > 0))
+	anc.contributors <- rbind(anc.contributors, data.frame(year=time.periods[i], N=n, Percent=((n/nexist)*100),N_EXIST=nexist))
+}
+
+anc.contributors
+#   year  N   Percent N_EXIST
+#1  2002  4 100.00000       4
+#2  2003 20 100.00000      20
+#3  2004 29  82.85714      35
+#4  2005 20  51.28205      39
+#5  2006 11  28.20513      39
+#6  2007 14  33.33333      42
+#7  2008 27  46.55172      58
+#8  2009 28  43.75000      64
+#9  2010 35  47.29730      74
+#10 2011 32  43.24324      74
+#11 2012 32  43.24324      74
+#12 2013 30  40.54054      74
+#13 2014 30  40.54054      74
+#14 2015 29  39.18919      74
+#15 2016 29  39.18919      74
+#16 2017 26  35.13514      74
+#17 2018 25  33.78378      74
+#18 2019 25  33.78378      74
+#19 2020 25  33.78378      74
+#20 2021 25  33.78378      74
+#21 2022 25  33.78378      74
+
+# number of contributing ancestors out of the potential number of ancestral lineages over time
+anc.df <- NULL
+for (i in 1:nrow(anc.contributors)) {
+	anc.df <- rbind(anc.df, data.frame(year=anc.contributors$year[i], count="total", N=anc.contributors$N_EXIST[i]))
+	anc.df <- rbind(anc.df, data.frame(year=anc.contributors$year[i], count="contributors", N=anc.contributors$N[i]))
+}
+
+anc.df$count <- factor(anc.df$count, levels=c("total", "contributors"))
+anc.df.sub <- anc.df[which(anc.df$year > 2002),] # only plot years 2003+
+
+# average and maximum contributions of specific lineages
+
+# RLKS-K from 2008-2022
+mean(as.matrix(pop.pfocal[which(pop.pfocal$ID == "RLS-K"),which(colnames(pop.pfocal) == "cohort.2008"):which(colnames(pop.pfocal) == "cohort.2022")])) # mean
+# [1] 0.1339778 # mean
+sd(as.matrix(pop.pfocal[which(pop.pfocal$ID == "RLS-K"),which(colnames(pop.pfocal) == "cohort.2008"):which(colnames(pop.pfocal) == "cohort.2022")])) # stanard deviation
+# [1] 0.03263044 # standard deviation
+max(as.matrix(pop.pfocal[which(pop.pfocal$ID == "RLS-K"),which(colnames(pop.pfocal) == "cohort.2008"):which(colnames(pop.pfocal) == "cohort.2022")])) # max
+#[1] 0.1730849 # max
+
+# WSA-K from 2008-2022
+mean(as.matrix(pop.pfocal[which(pop.pfocal$ID == "WSA-K"),which(colnames(pop.pfocal) == "cohort.2008"):which(colnames(pop.pfocal) == "cohort.2022")])) # mean
+# [1] 0.1041607 # mean
+sd(as.matrix(pop.pfocal[which(pop.pfocal$ID == "WSA-K"),which(colnames(pop.pfocal) == "cohort.2008"):which(colnames(pop.pfocal) == "cohort.2022")])) # standard deviation
+# [1] 0.03203001 # standard deviation
+max(as.matrix(pop.pfocal[which(pop.pfocal$ID == "WSA-K"),which(colnames(pop.pfocal) == "cohort.2008"):which(colnames(pop.pfocal) == "cohort.2022")])) # max
+# [1] 0.149241 # max
+
+# mean contribution for all individuals since 2008
+avg.contribution <- NULL
+for (id2 in pop.pfocal$ID) {
+	val <- mean(as.matrix(pop.pfocal[which(pop.pfocal$ID == id2),which(colnames(pop.pfocal) == "cohort.2008"):which(colnames(pop.pfocal) == "cohort.2022")]), na.rm=TRUE)
+	avg.contribution <- rbind(avg.contribution, data.frame(ID=id2, AVG_PROPORTION=val))
+}
+
+avg.contribution <- avg.contribution[order(-avg.contribution$AVG_PROPORTION),]
+
+head(avg.contribution, n=16)
+#      ID AVG_PROPORTION
+#44 RLS-K     0.13397785
+#5  WSA-K     0.10416071
+#46 OK-RS     0.05648191
+#22 K-SLA     0.05161644
+#60 SK-RG     0.04947236
+#53 BK-FS     0.04824063
+#45 BK-AS     0.04575711
+#1  SR-PK     0.04531992
+#8  K-RSW     0.03753052
+#40 BK-LS     0.03660300
+#4  WSF-K     0.03217750
+#23 K-SBF     0.02936139
+#14 LK-SG     0.02834174
+#17 AK-SP     0.02629410
+#7  K-GSW     0.02488999
+#66 F-BPS     0.02471368
+
+# average collective contribution of RLS-K and WSA-K since 2008
+rlsk.idx = which(pop.pfocal$ID == "RLS-K")
+wsak.idx = which(pop.pfocal$ID == "WSA-K")
+comb.contribution <- NULL
+for (tidx in which(colnames(pop.pfocal) == "cohort.2008"):which(colnames(pop.pfocal) == "cohort.2022")) {
+	comb.contribution = c(comb.contribution,pop.pfocal[rlsk.idx,tidx] + pop.pfocal[wsak.idx,tidx])
+}
+mean(comb.contribution)
+# [1] 0.2381386 # mean
+sd(comb.contribution)
+#[1] 0.06403289 # standard deviation
+max(comb.contribution)
+#[1] 0.322263 # max
+
+# Proportion of genomic copies contributed by the top 16 contributors in 2022
+
+ntop = 16
+# pop.pfocal row indices of the top contributors in 2022 
+topidx = unname(sapply(pop.pfocal[order(-pop.pfocal$cohort.2022),1][1:ntop],function(x,df){which(df$ID == x)},df=pop.pfocal))
+# calculate the sum of the top contributor's genomic contribution for each year
+top.contribution <- NULL
+for (i in 1:length(time.periods)) {
+	top.contribution <- rbind(top.contribution, data.frame(YEAR=time.periods[i], PROPORTION_GENOMIC_COPIES = sum(pop.pfocal[topidx,i+1], na.rm=TRUE)))
+}
+
+top.contribution
+#   YEAR PROPORTION_GENOMIC_COPIES
+#1  2002                 0.2500000
+#2  2003                 0.2000000
+#3  2004                 0.1707317
+#4  2005                 0.3076927
+#5  2006                 0.4999996
+#6  2007                 0.5270272
+#7  2008                 0.6368874
+#8  2009                 0.7583543
+#9  2010                 0.6504852
+#10 2011                 0.6963268
+#11 2012                 0.6982892
+#12 2013                 0.6773675
+#13 2014                 0.7156768
+#14 2015                 0.7716050
+#15 2016                 0.7612648
+#16 2017                 0.7900778
+#17 2018                 0.8003363
+#18 2019                 0.8580870
+#19 2020                 0.8346470
+#20 2021                 0.8618459
+#21 2022                 0.8802618
+
+# minimum contribution since 2015
+min(top.contribution[which(top.contribution$YEAR == 2015):nrow(top.contribution),2])
+# [1] 0.7612648
+
+
+## set plotting parameters for visualizing ancestor contribution proportions to the CR population
+
+# get ID of top contributors to 2022 cohort
+id.sort <- pop.pfocal$ID[order(-pop.pfocal$cohort.2022)] # individuals ordered by contribution in 2022
+pop.pfocal$rank.2022 <- match(pop.pfocal$ID,id.sort)
+
+id.sort[1:16]
+# [1] "RLS-K" "WSA-K" "K-SLA" "OK-RS" "SK-RG" "BK-FS" "K-RSW" "K-SBF" "SR-PK"
+# [10] "BK-LS" "K-GSW" "WSF-K" "LK-SG" "BK-AS" "WK-LS" "F-BPS"
+
+# set colors for individuals (lines) of interest: top 16 contributors to 2022 population, which contributed over 75% of ancestry since 2015.
+pop.pfocal$color <- "gray30"
+pop.pfocal$color[which(pop.pfocal$ID == "RLS-K")] <- "red3"
+pop.pfocal$color[which(pop.pfocal$ID == "WSA-K")] <- "blue1"
+pop.pfocal$color[which(pop.pfocal$ID == "K-SLA")] <- "cyan"
+pop.pfocal$color[which(pop.pfocal$ID == "OK-RS")] <- "steelblue1"
+pop.pfocal$color[which(pop.pfocal$ID == "SK-RG")] <- "darkorange"
+pop.pfocal$color[which(pop.pfocal$ID == "BK-FS")] <- "indianred4"
+pop.pfocal$color[which(pop.pfocal$ID == "K-RSW")] <- "peru"
+pop.pfocal$color[which(pop.pfocal$ID == "K-SBF")] <- "tan"
+pop.pfocal$color[which(pop.pfocal$ID == "SR-PK")] <- "purple"
+pop.pfocal$color[which(pop.pfocal$ID == "BK-LS")] <- "mediumpurple1"
+pop.pfocal$color[which(pop.pfocal$ID == "K-GSW")] <- "plum2"
+pop.pfocal$color[which(pop.pfocal$ID == "WSF-K")] <- "magenta"
+pop.pfocal$color[which(pop.pfocal$ID == "LK-SG")] <- "deeppink3"
+pop.pfocal$color[which(pop.pfocal$ID == "BK-AS")] <- "hotpink"
+pop.pfocal$color[which(pop.pfocal$ID == "WK-LS")] <- "darkmagenta"
+pop.pfocal$color[which(pop.pfocal$ID == "F-BPS")] <- "darkblue"
+
+# set line width for top 16 contributors to 2022
+pop.pfocal$lw <- 1
+pop.pfocal$lw[which(pop.pfocal$ID == "RLS-K")] <- 2
+pop.pfocal$lw[which(pop.pfocal$ID == "WSA-K")] <- 2
+pop.pfocal$lw[which(pop.pfocal$ID == "K-SLA")] <- 2
+pop.pfocal$lw[which(pop.pfocal$ID == "OK-RS")] <- 2
+pop.pfocal$lw[which(pop.pfocal$ID == "SK-RG")] <- 2
+pop.pfocal$lw[which(pop.pfocal$ID == "BK-FS")] <- 2
+pop.pfocal$lw[which(pop.pfocal$ID == "K-RSW")] <- 2
+pop.pfocal$lw[which(pop.pfocal$ID == "K-SBF")] <- 2
+pop.pfocal$lw[which(pop.pfocal$ID == "SR-PK")] <- 2
+pop.pfocal$lw[which(pop.pfocal$ID == "BK-LS")] <- 2
+pop.pfocal$lw[which(pop.pfocal$ID == "K-GSW")] <- 2
+pop.pfocal$lw[which(pop.pfocal$ID == "WSF-K")] <- 2
+pop.pfocal$lw[which(pop.pfocal$ID == "LK-SG")] <- 2
+pop.pfocal$lw[which(pop.pfocal$ID == "BK-AS")] <- 2
+pop.pfocal$lw[which(pop.pfocal$ID == "WK-LS")] <- 2
+pop.pfocal$lw[which(pop.pfocal$ID == "F-BPS")] <- 2
+
+# set line type according to resident vs translocated
+pop.pfocal$ltype <- unname(sapply(id,function(x,df){df$Biological_Origin_Status}[which(df$COLOR_ID == x)],df=meta))
+pop.pfocal$ltype[which(pop.pfocal$ltype == "T" | pop.pfocal$ltype == "Donor_Population")] <- 1
+pop.pfocal$ltype[which(pop.pfocal$ltype == "IE" | pop.pfocal$ltype == "LR")] <- 2
+pop.pfocal$ltype <- as.numeric(pop.pfocal$ltype)
+
+
+## Plot stacked area chart of contributing ancestors with individual ancestor lines - Figure 2A (ignore warnings)
+
+pop.pfocal$lstr <- replace(pop.pfocal$ltype,which(pop.pfocal$ltype == 1), "solid")
+pop.pfocal$lstr <- replace(pop.pfocal$lstr,which(pop.pfocal$ltype == "2"), "dashed")
+pop.pfocal$lw2 <- replace(pop.pfocal$lw,which(pop.pfocal$lw == 2), 0.75)
+pop.pfocal$lw2 <- replace(pop.pfocal$lw2,which(pop.pfocal$lw2 == 1), 0.50)
+
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/T_IE_population_number_ancestors_area_chart_v3.png',width=16, height=7, units='in', res=300) # offset x-axis title
+x11(width=16,height=7)
+
+prop.cutoff=0.2
+
+gg.pop <- ggplot(anc.df.sub, aes(x=year, y=N, fill=count)) +
+
+theme_classic() +
+
+geom_area(position="identity") +
+
+coord_cartesian(xlim=c(2003,2022),ylim=c(0,75)) +
+
+scale_fill_manual(values=c(alpha("gray70",0.6),alpha("gray40",0.6))) +
+
+scale_x_continuous(breaks=time.periods2) +
+
+scale_y_continuous(name="Number ancestors", breaks=seq(from=0,to=75,by=5), sec.axis=sec_axis(~./75*prop.cutoff, name="Proportion ancestor contribution to population", 
+breaks=seq(from=0,to=prop.cutoff,by=0.02), )) +
+
+theme(legend.position="none", axis.text.x = element_text(size=17,color="black"), axis.ticks.length.x=unit(0.25,"cm"), axis.title.x=element_text(size=20, color="black", hjust=0.8),
+axis.text.y = element_text(size=17,color="black"), axis.ticks.length.y=unit(0.25,"cm"),axis.title.y=element_text(size=20,color="black", vjust=1.5),
+axis.title.y.right = element_text(size=20, color="black", vjust=1.5)) +
+
+xlab("Year")
+
+for (k in 1:nrow(pop.pfocal)) {
+	tmpvec <- NULL
+	for (j in 3:22) { tmpvec <- c(tmpvec,c(pop.pfocal[k,j],NA)) }
+	gg.pop <- gg.pop + geom_line(aes_string(y=tmpvec*(75/prop.cutoff)), color=pop.pfocal$color[k], linetype=pop.pfocal$lstr[k], lwd=pop.pfocal$lw2[k])
+}
+
+gg.pop
+
+#dev.off()
+
+## Plot stacked barplot of expected ancestral genetic contributions - Figure 2B
+
+# stacked barplot where each individual is a box and color by group using gradients and distinct colors
+
+topid <- pop.pfocal$ID[topidx] # these are the individuals that contributed >75% ancestry to the CR population since 2015
+topid
+# [1] "RLS-K" "WSA-K" "K-SLA" "OK-RS" "SK-RG" "BK-FS" "K-RSW" "K-SBF" "SR-PK"
+# [10] "BK-LS" "K-GSW" "WSF-K" "LK-SG" "BK-AS" "WK-LS" "F-BPS
+
+# set groups for barplot coloring
+
+pop.pgroup2 <- pop.pfocal[,1:22]
+pop.pgroup2$biotype = unname(sapply(pop.pgroup2$ID, function(x,df){idx=which(df$COLOR_ID == x); btype=df$Biological_Origin_Status[idx];ifelse(btype == "T", "Trans", "Res")},df=meta))
+
+pop.pgroup2$bargrp <- pop.pgroup2$biotype
+pop.pgroup2$bargrp[which(pop.pgroup2$ID %in% topid == TRUE)] <- "top"
+
+# sort by descending contribution to 2022 within groups
+pop.pgroup2$bargrp <- factor(pop.pgroup2$bargrp,levels=c("top","Trans","Res"),ordered=TRUE)
+pop.pgroup2 <- pop.pgroup2[order(pop.pgroup2$bargrp,-pop.pgroup2$cohort.2022),]
+
+# color top individuals
+
+pop.pgroup2$barcol <- pop.pfocal$ID
+pop.pgroup2$barcol[which(pop.pgroup2$ID == "RLS-K")] <- "red3"
+pop.pgroup2$barcol[which(pop.pgroup2$ID == "WSA-K")] <- "blue1"
+pop.pgroup2$barcol[which(pop.pgroup2$ID == "K-SLA")] <- "cyan"
+pop.pgroup2$barcol[which(pop.pgroup2$ID == "OK-RS")] <- "steelblue1"
+pop.pgroup2$barcol[which(pop.pgroup2$ID == "SK-RG")] <- "darkorange"
+pop.pgroup2$barcol[which(pop.pgroup2$ID == "BK-FS")] <- "indianred4"
+pop.pgroup2$barcol[which(pop.pgroup2$ID == "K-RSW")] <- "peru"
+pop.pgroup2$barcol[which(pop.pgroup2$ID == "K-SBF")] <- "tan"
+pop.pgroup2$barcol[which(pop.pgroup2$ID == "SR-PK")] <- "purple"
+pop.pgroup2$barcol[which(pop.pgroup2$ID == "BK-LS")] <- "mediumpurple1"
+pop.pgroup2$barcol[which(pop.pgroup2$ID == "K-GSW")] <- "plum2"
+pop.pgroup2$barcol[which(pop.pgroup2$ID == "WSF-K")] <- "magenta"
+pop.pgroup2$barcol[which(pop.pgroup2$ID == "LK-SG")] <- "deeppink3"
+pop.pgroup2$barcol[which(pop.pgroup2$ID == "BK-AS")] <- "hotpink"
+pop.pgroup2$barcol[which(pop.pgroup2$ID == "WK-LS")] <- "darkmagenta"
+pop.pgroup2$barcol[which(pop.pgroup2$ID == "F-BPS")] <- "darkblue"
+
+# gradient color remaining translocated individuals
+trans.col.vec = NULL
+trans.col="gold2"
+trans.idx <- which(pop.pgroup2$bargrp == "Trans")
+step = 1/(length(trans.idx)+10)
+c = 1;
+for (i in trans.idx) {
+	pop.pgroup2$barcol[i] <- alpha(trans.col,c)
+	trans.col.vec <- c(trans.col.vec,pop.pgroup2$barcol[i])
+	c = c-step
+}
+
+# gradient color for remaining resident individuals
+res.col.vec = NULL
+res.col="gray30"
+res.idx <- which(pop.pgroup2$bargrp == "Res")
+step = 1/(length(res.idx)+5)
+c = 1;
+for (i in res.idx) {
+        pop.pgroup2$barcol[i] <- alpha(res.col,c)
+	res.col.vec <- c(res.col.vec,pop.pgroup2$barcol[i])
+        c = c-step
+}
+
+# convert data.frame into matrix for plotting
+#pop.pgroup2.mat <- as.matrix(pop.pgroup2[,2:22])
+pop.pgroup2.mat <- as.matrix(pop.pgroup2[,3:22]) # excludes 2002
+pop.pgroup2.mat[which(is.na(pop.pgroup2.mat))] <- 0
+
+
+# gradient color box for legend
+
+trans.col.width = seq(from=0,to=1,by=(1/length(trans.col.vec)))
+res.col.width = seq(from=0,to=1,by=(1/length(res.col.vec)))
+
+X11()
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/T_IE_pop_contribution_pfocal_barplot_key.png', width=7, height=7, units='in', res=300)
+#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/figures/T_IE_pop_contribution_pfocal_barplot_key.pdf', width=7, height=7)
+#plot.new()
+
+yb = 0.1
+yt = 0.3
+plot(1, type="n", xlab="", ylab="", xlim=c(-0.05,1.05), ylim=c(-0.05,1.05))
+for (i in 1:(length(trans.col.width)-1)) {
+	xs = trans.col.width[i]
+	xe = trans.col.width[i+1]
+	rect(xleft=xs, xright=xe, ybottom=yb, ytop=yt, border="gray50", lwd=0.3, col=trans.col.vec[i])
+}
+rect(xleft=trans.col.width[1], xright=trans.col.width[length(trans.col.width)], ybottom=yb, ytop=yt, border="gray20", lwd=1, col=NA)
+
+res.col.width = seq(from=0,to=1,by=(1/length(res.col.vec)))
+yb = 0.5
+yt = 0.7
+for (i in 1:(length(res.col.width)-1)) {
+        xs = res.col.width[i]
+        xe = res.col.width[i+1]
+        rect(xleft=xs, xright=xe, ybottom=yb, ytop=yt, border="gray10", lwd=0.3, col=res.col.vec[i])
+}
+rect(xleft=res.col.width[1], xright=res.col.width[length(res.col.width)], ybottom=yb, ytop=yt, border="gray20", lwd=1, col=NA)
+
+#dev.off()
+
+# plot stacked barplot
+
+nyears = length(time.periods2)
+
+years.vec <- NULL
+for (i in time.periods2) { years.vec <- c(years.vec,rep(i,nrow(pop.pgroup2))) }
+
+contribution.p = NULL
+for (i in 1:ncol(pop.pgroup2.mat)) {contribution.p <- c(contribution.p, unname(pop.pgroup2.mat[,i]))}
+
+pat <- replace(pop.pgroup2$biotype, which(pop.pgroup2$biotype == "Res"), "stripe")
+pat <- replace(pat, which(pat != "stripe"), "none")
+
+pop.pgroup3 <- data.frame(year=years.vec, ID=rep(pop.pgroup2$ID,nyears), proportion=contribution.p, color=rep(pop.pgroup2$barcol,nyears), pattern=rep(pat,nyears))
+pop.pgroup3$year <- as.factor(pop.pgroup3$year) # need to do this for proper x-axis labels
+
+pat.shift = NULL
+xshift=0
+pstep = 1/length(which(pat=="stripe"))
+for (i in pat) {
+	if (i == "stripe") {
+		xshift = xshift + pstep
+		pat.shift = c(pat.shift,xshift)
+	} else pat.shift = c(pat.shift,0)
+}
+
+# begin plot
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/T_IE_pop_contribution_pfocal_barplot_2003_2022.png',width=16, height=7, units='in', res=300)
+x11(width=16,height=7)
+ggplot(pop.pgroup3, aes(fill=ID, y=proportion, x=year)) +
+
+theme_classic() +
+
+geom_bar_pattern(position="stack", stat="identity", pattern=pop.pgroup3$pattern, pattern_fill = "black", fill=pop.pgroup3$color, linewidth=0.5, color="black",
+pattern_spacing = 0.012, pattern_density=0.05, pattern_size=0.45, pattern_yoffset=rep(pat.shift,nyears)) +
+
+theme(legend.position="none", axis.text.x = element_text(size=17, color="black",vjust=4), axis.text.y = element_text(size=17, color="black"), axis.ticks.x=element_blank(),
+axis.title.x=element_text(size = 20, color="black", vjust=2), axis.title.y=element_text(size = 20, color="black",vjust=2), axis.line.x=element_blank(), axis.line.y=element_blank(), 
+axis.ticks.length.y=unit(0.25, "cm")) +
+
+annotate(x=0, xend=0, y=0, yend=1, colour="black", lwd=0.75, geom="segment") +
+
+xlab("Year") +
+
+ylab("Proportion ancestor contribution to population")
+
+#dev.off()
+
+--- end R code for T and IE temporal contributions to population ---
+
+
+Collect information about RLS-K relatives.
+
+--- start R code for RLK-S relative assessment ---
+
+rmat <- read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/cr_ped_20230512_relatedness_matrix.txt',head=TRUE)
+rmat[which(colnames(rmat) == "RLS.K"),which(colnames(rmat) == "K.SLA")]
+# [1] 0.125 # r between RLS-K and K-SLA
+
+# find all translocated relatives of RLS-K
+trans <- read.csv('/home/tyler/Dropbox/research/jay/mosaic/metadata/Translocated_Jay_Individual_Statistics.tsv',head=TRUE,sep="\t")
+rlsk.relatives <- colnames(rmat)[which(rmat[which(colnames(rmat) == "RLS.K"),] > 0)]
+trans.id <- gsub("-",".",trans$COLOR_ID)
+rlsk.relatives.trans <- rlsk.relatives[rlsk.relatives %in% trans.id]
+rlsk.relatives.trans <- rlsk.relatives.trans[-which(rlsk.relatives.trans == "RLS.K")]
+rlsk.relatives.trans
+#[1] "SK.RG" "SK.RB" "SK.RP" "SRR.K" "K.SAP" "K.SLA" "K.SPR" "K.SAG"
+
+--- end R code for RLS-K relative assessment ---
+
+
 
 ## ---------- SKEW ANALYSIS WITH GENOMIC DATA ---------- ##
 
@@ -3083,892 +3571,7 @@ points(x=1:nrow(kstat.sort), y=kstat.sort$Swtr, pch=1, col=pointcols, cex=1.7, l
 
 --- end R code for plotting individual average rank-weighted skew distribution ---
 
-## Plots of expected genetic contribution through time to population - TL TODO
-
---- begin R code for T and IE temporal contributions to population ---
-
-library(scales) # for alpha colors
-library(ggplot2)
-
-meta <- read.table("/home/tyler/Dropbox/research/jay/mosaic/metadata/jayid_map_20230512.txt",head=TRUE,sep="\t")
-fdir='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/pop_temporal/'
-ped <- read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/cr_ped_20230512.tsv', head=TRUE, na.strings='*')
-
-pop.n <- NULL # data frame of number of expected genomic copies
-pop.pfocal <- NULL # data frame of contributions normalized by focal ancestors
-pop.pmax <- NULL # data frame of contribution normalized by max cohort pop contribution
-
-# read in pedstat files for time points 2002-2022
-
-time.periods = 2002:2022
-
-# subset time periods for plots that follow so that they span years 2003-2022 (exclude 2002)
-time.periods2 <- time.periods[2:length(time.periods)]
-
-tidx <- 2:(length(time.periods)+1) # these are the contribution columns in matrix
-id <- NULL
-for (t in time.periods) {
-	df <- read.table(paste0(fdir,'T_IE_20230512_',t,'_pop_contribution.pedstat1'),head=TRUE)
-	if (is.null(id)) id <- df[,1]
-	pop.n <- cbind(pop.n, df[,2])
-	pop.pfocal <- cbind(pop.pfocal, df[,3])
-	pop.pmax <- cbind(pop.pmax, df[,4])
-}
-
-# mask values of individuals if they weren't born
-ped.sub <- ped[which(ped$ID %in% id),c(1,5)]
-ped.sub <- ped.sub[match(id,ped.sub$ID),]
-for (i in 1:length(time.periods)) {
-	t = time.periods[i]
-	idx <- which(ped.sub$COHORT > t)
-	if (length(idx) > 0) {
-		pop.n[idx,i] <- NA
-		pop.pfocal[idx,i] <- NA
-		pop.pmax[idx,i] <- NA	
-	}
-}
-
-# NOTE: Recalculating proportions here such that they sum to 1 because KRS- and SR-PK sired translocated individuals
-# prior to arriving in the Wellfield in 2005 and 2009, respectively. Counting contributions AFTER existing in 
-# the CR makes the total contribution of ancestors <1. Therefore, resumming to count only the contributions
-# of individuals after they arrive in the CR (after masking has been applied). Total ancestor contribution will now be 1.
-
-for (i in 1:ncol(pop.pfocal)) {
-	pop.pfocal[,i] <- pop.pfocal[,i]/sum(pop.pfocal[,i], na.rm=TRUE)
-}
-
-#
-#
-
-
-pop.n <- cbind(data.frame(ID=id),as.data.frame(pop.n)) # add sample names
-colnames(pop.n) <- c("ID",paste0("cohort.",time.periods))
-
-pop.pfocal <- cbind(data.frame(ID=id),as.data.frame(pop.pfocal)) # add sample names
-colnames(pop.pfocal) <- c("ID",paste0("cohort.",time.periods))
-
-pop.pmax <- cbind(data.frame(ID=id),as.data.frame(pop.pmax)) # add sample names
-colnames(pop.pmax) <- c("ID",paste0("cohort.",time.periods))
-
-# proportion with respect to focal ancestors plot
-
-# get ID of top contributors to 2022 cohort
-id.sort <- pop.pfocal$ID[order(-pop.pfocal$cohort.2022)] # individuals ordered by contribution in 2022
-pop.pfocal$rank.2022 <- match(pop.pfocal$ID,id.sort)
-
-#> id.sort[1:16]
-# [1] "RLS-K" "WSA-K" "K-SLA" "OK-RS" "SK-RG" "BK-FS" "K-RSW" "K-SBF" "SR-PK"
-# [10] "BK-LS" "K-GSW" "WSF-K" "LK-SG" "BK-AS" "WK-LS" "F-BPS"
-
-# set colors for individuals (lines) of interest: top 16 contributors to 2022 population, which contributed over 75% of ancestry since 2015.
-pop.pfocal$color <- "gray30"
-pop.pfocal$color[which(pop.pfocal$ID == "RLS-K")] <- "red3"
-pop.pfocal$color[which(pop.pfocal$ID == "WSA-K")] <- "blue1"
-pop.pfocal$color[which(pop.pfocal$ID == "K-SLA")] <- "cyan"
-pop.pfocal$color[which(pop.pfocal$ID == "OK-RS")] <- "steelblue1"
-pop.pfocal$color[which(pop.pfocal$ID == "SK-RG")] <- "darkorange"
-pop.pfocal$color[which(pop.pfocal$ID == "BK-FS")] <- "indianred4"
-pop.pfocal$color[which(pop.pfocal$ID == "K-RSW")] <- "peru"
-pop.pfocal$color[which(pop.pfocal$ID == "K-SBF")] <- "tan"
-pop.pfocal$color[which(pop.pfocal$ID == "SR-PK")] <- "purple"
-pop.pfocal$color[which(pop.pfocal$ID == "BK-LS")] <- "mediumpurple1"
-pop.pfocal$color[which(pop.pfocal$ID == "K-GSW")] <- "plum2"
-pop.pfocal$color[which(pop.pfocal$ID == "WSF-K")] <- "magenta"
-pop.pfocal$color[which(pop.pfocal$ID == "LK-SG")] <- "deeppink3"
-pop.pfocal$color[which(pop.pfocal$ID == "BK-AS")] <- "hotpink"
-pop.pfocal$color[which(pop.pfocal$ID == "WK-LS")] <- "darkmagenta"
-pop.pfocal$color[which(pop.pfocal$ID == "F-BPS")] <- "darkblue"
-
-# set line width for top 16 contributors to 2022
-pop.pfocal$lw <- 1
-pop.pfocal$lw[which(pop.pfocal$ID == "RLS-K")] <- 2
-pop.pfocal$lw[which(pop.pfocal$ID == "WSA-K")] <- 2
-pop.pfocal$lw[which(pop.pfocal$ID == "K-SLA")] <- 2
-pop.pfocal$lw[which(pop.pfocal$ID == "OK-RS")] <- 2
-pop.pfocal$lw[which(pop.pfocal$ID == "SK-RG")] <- 2
-pop.pfocal$lw[which(pop.pfocal$ID == "BK-FS")] <- 2
-pop.pfocal$lw[which(pop.pfocal$ID == "K-RSW")] <- 2
-pop.pfocal$lw[which(pop.pfocal$ID == "K-SBF")] <- 2
-pop.pfocal$lw[which(pop.pfocal$ID == "SR-PK")] <- 2
-pop.pfocal$lw[which(pop.pfocal$ID == "BK-LS")] <- 2
-pop.pfocal$lw[which(pop.pfocal$ID == "K-GSW")] <- 2
-pop.pfocal$lw[which(pop.pfocal$ID == "WSF-K")] <- 2
-pop.pfocal$lw[which(pop.pfocal$ID == "LK-SG")] <- 2
-pop.pfocal$lw[which(pop.pfocal$ID == "BK-AS")] <- 2
-pop.pfocal$lw[which(pop.pfocal$ID == "WK-LS")] <- 2
-pop.pfocal$lw[which(pop.pfocal$ID == "F-BPS")] <- 2
-
-# color below are deprecated
-# set colors for individuals (lines) of interest (top 10 contributors to 2022 cohort)
-#pop.pfocal$color <- "gray30" # use for top 10
-#pop.pfocal$color <- "black" # use for top 3
-#pop.pfocal$color[which(pop.pfocal$ID == "RLS-K")] <- "red"
-#pop.pfocal$color[which(pop.pfocal$ID == "WSA-K")] <- "purple"
-#pop.pfocal$color[which(pop.pfocal$ID == "K-SLA")] <- "steelblue1" # used for top 3 
-#pop.pfocal$color[which(pop.pfocal$ID == "K-SLA")] <- "cyan" # used for top 10
-# uncomment individuals below to denote top 10 contributors
-#pop.pfocal$color[which(pop.pfocal$ID == "OK-RS")] <- "orange"
-#pop.pfocal$color[which(pop.pfocal$ID == "SK-RG")] <- "magenta"
-#pop.pfocal$color[which(pop.pfocal$ID == "BK-FS")] <- "royalblue1"
-#pop.pfocal$color[which(pop.pfocal$ID == "K-RSW")] <- "turquoise3"
-#pop.pfocal$color[which(pop.pfocal$ID == "K-SBF")] <- "palevioletred1"
-#pop.pfocal$color[which(pop.pfocal$ID == "SR-PK")] <- "red4"
-#pop.pfocal$color[which(pop.pfocal$ID == "BK-LS")] <- "blue"
-
-# set line width
-#pop.pfocal$lw = 1
-#pop.pfocal$lw[which(pop.pfocal$ID == "RLS-K")] <- 2
-#pop.pfocal$lw[which(pop.pfocal$ID == "WSA-K")] <- 2
-#pop.pfocal$lw[which(pop.pfocal$ID == "K-SLA")] <- 2
-# uncomment individuals below to denote top 10 contributors
-#pop.pfocal$lw[which(pop.pfocal$ID == "OK-RS")] <- 2
-#pop.pfocal$lw[which(pop.pfocal$ID == "SK-RG")] <- 2
-#pop.pfocal$lw[which(pop.pfocal$ID == "BK-FS")] <- 2
-#pop.pfocal$lw[which(pop.pfocal$ID == "K-RSW")] <- 2
-#pop.pfocal$lw[which(pop.pfocal$ID == "K-SBF")] <- 2
-#pop.pfocal$lw[which(pop.pfocal$ID == "SR-PK")] <- 2
-#pop.pfocal$lw[which(pop.pfocal$ID == "BK-LS")] <- 2
-
-# set line type according to resident vs translocated
-pop.pfocal$ltype <- unname(sapply(id,function(x,df){df$Biological_Origin_Status}[which(df$COLOR_ID == x)],df=meta))
-pop.pfocal$ltype[which(pop.pfocal$ltype == "T" | pop.pfocal$ltype == "Donor_Population")] <- 1
-pop.pfocal$ltype[which(pop.pfocal$ltype == "IE" | pop.pfocal$ltype == "LR")] <- 2
-pop.pfocal$ltype <- as.numeric(pop.pfocal$ltype)
-
-# plot proportion of focal ancestor contributions over time
-
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/pop_temporal/T_IE_20230512_pop_contributions.pdf', width=16, height=7) # deprecated
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/T_IE_pop_contribution_pfocal.png',width=16, height=7, units='in', res=300)
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/T_IE_pop_contribution_pfocal_v2.png',width=16, height=7, units='in', res=300)
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/T_IE_pop_contribution_pfocal_v3.png',width=16, height=7, units='in', res=300)
-#par(mgp = c(2.75,1,0))
-x11(width=16,height=7)
-
-plot(1, type="n", xlim=c(time.periods[1],time.periods[length(time.periods)]), ylim=c(0,max(pop.pfocal[,tidx],na.rm=TRUE)+0.00),
-xlab="Year", ylab="Proportion ancestor contribution to population", main="",xaxt='n', cex.axis=1.3, cex.lab=1.5)
-axis(side=1,at=time.periods,labels=time.periods,cex=1.5,cex.axis=1.3)
-
-for (i in 1:nrow(pop.pfocal)) {
-	# draw lines
-	lines(x=time.periods, y=pop.pfocal[i,tidx],col=alpha(pop.pfocal$color[i],0.6), lty=pop.pfocal$ltype[i], lwd=pop.pfocal$lw[i])
-}
-
-# plot mean line (omitted for v3)
-#lines(x=time.periods, y=sapply(tidx,function(x,df){mean(df[,x],na.rm=TRUE)},df=pop.pfocal), lty=6, col="black", lwd=2)
-
-# add legend
-#grid(nx=110, ny=50, lty=2) # for aligning things
-
-# legend configuration 1
-#legend(x=2004, y=0.2625,"Translocated",lty=1,bty='n',cex=1.3, lwd=1.7, seg.len=2.9)
-#legend(x=2008, y=0.2625,"Resident",lty=2,bty='n',cex=1.3, lwd=1.7, seg.len=2.9)
-#legend(x=2011.4, y=0.2625,"Mean",lty=6,bty='n',cex=1.3, lwd=1.7, seg.len=2.9)
-
-# legend configuration 2 - works best with added nesting annotations
-legend('topright',c("Translocated","Resident"),lty=c(1,2),bty='n', lwd=1.7, cex=1.3, seg.len=2.9) # v3
-#legend('topright',c("Translocated","Resident","Mean"),lty=c(1,2,6),bty='n', lwd=1.7, cex=1.3, seg.len=2.9) # v2
-
-
-# legend configuration 3
-#legend('topleft',c("Translocated","Resident","Mean"),lty=c(1,2,6),bty='n',cex=1.3)
-
-#dev.off()
-
-# calculate number of ancestors present in the CR that make a genetic contribtuion to the population
-anc.contributors <- NULL
-for (i in 1:length(time.periods)) {
-	j <- i+1
-	nexist <- length(which(!is.na(pop.pfocal[,j])))
-	n <- length(which(pop.pfocal[,j] > 0))
-	anc.contributors <- rbind(anc.contributors, data.frame(year=time.periods[i], N=n, Percent=((n/nexist)*100),N_EXIST=nexist))
-}
-
-#> anc.contributors
-#   year  N   Percent N_EXIST
-#1  2002  4 100.00000       4
-#2  2003 20 100.00000      20
-#3  2004 29  82.85714      35
-#4  2005 20  51.28205      39
-#5  2006 11  28.20513      39
-#6  2007 14  33.33333      42
-#7  2008 27  46.55172      58
-#8  2009 28  43.75000      64
-#9  2010 35  47.29730      74
-#10 2011 32  43.24324      74
-#11 2012 32  43.24324      74
-#12 2013 30  40.54054      74
-#13 2014 30  40.54054      74
-#14 2015 29  39.18919      74
-#15 2016 29  39.18919      74
-#16 2017 26  35.13514      74
-#17 2018 25  33.78378      74
-#18 2019 25  33.78378      74
-#19 2020 25  33.78378      74
-#20 2021 25  33.78378      74
-#21 2022 25  33.78378      74
-
-# plot number of contributing ancestors out of the potential number of ancestral lineages over time
-anc.df <- NULL
-for (i in 1:nrow(anc.contributors)) {
-	anc.df <- rbind(anc.df, data.frame(year=anc.contributors$year[i], count="total", N=anc.contributors$N_EXIST[i]))
-	anc.df <- rbind(anc.df, data.frame(year=anc.contributors$year[i], count="contributors", N=anc.contributors$N[i]))
-}
-
-anc.df$count <- factor(anc.df$count, levels=c("total", "contributors"))
-anc.df.sub <- anc.df[which(anc.df$year > 2002),] # only plot years 2003+
-
-# stacked area chart
-
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/T_IE_population_number_ancestors_area_chart.png',width=16, height=5, units='in', res=300)
-x11(width=16,height=5)
-
-ggplot(anc.df.sub, aes(x=year, y=N, fill=count)) + 
-
-theme_classic() +
-
-geom_vline(xintercept=time.periods2, col="gray80", linetype="dashed") +
-
-geom_hline(yintercept=seq(from=0,to=75,by=5),col="gray90", linetype="dashed") +
-
-geom_area(position="identity") + 
-
-coord_cartesian(xlim=c(2003,2022),ylim=c(0,75)) +
-
-scale_fill_manual(values=c(alpha("gray70",0.6),alpha("gray40",0.6))) +
-
-geom_line() +
-
-scale_x_continuous(breaks=time.periods2) +
-
-scale_y_continuous(name="Number ancestors", breaks=seq(from=0,to=75,by=5)) +
-
-#scale_y_continuous(name="Number ancestors", breaks=seq(from=0,to=75,by=5), sec.axis=) + # use for one axis
-
-
-theme(legend.position="none", axis.text.x = element_text(size=17,color="black"), axis.ticks.length.x=unit(0.25,"cm"), axis.title.x=element_text(size=20, color="black"),
-axis.text.y = element_text(size=17,color="black"), axis.ticks.length.y=unit(0.25,"cm"),axis.title.y=element_text(size=20,color="black", vjust=1.5)) +
-
-xlab("Year")
-
-#dev.off()
-
-########
-
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/T_IE_pop_contribution_pfocal_barplot_2003_2022.png',width=16, height=7, units='in', res=300)
-x11(width=16,height=7)
-ggplot(pop.pgroup3, aes(fill=ID, y=proportion, x=year)) +
-
-theme_classic() +
-
-geom_bar_pattern(position="stack", stat="identity", pattern=pop.pgroup3$pattern, pattern_fill = "black", fill=pop.pgroup3$color, linewidth=0.5, color="black",
-pattern_spacing = 0.012, pattern_density=0.05, pattern_size=0.45, pattern_yoffset=rep(pat.shift,nyears)) +
-
-#geom_bar(position="stack", stat="identity", fill=pop.pgroup3$color, linewidth=0.5, color="black", width=0.83) + # for testing purposes - no pattern
-
-theme(legend.position="none", axis.text.x = element_text(size=17, color="black",vjust=4), axis.text.y = element_text(size=17, color="black"), axis.ticks.x=element_blank(),
-axis.title.x=element_text(size = 20, color="black", vjust=2), axis.title.y=element_text(size = 20, color="black",vjust=2), axis.line.x=element_blank(), axis.line.y=element_blank(),
-axis.ticks.length.y=unit(0.25, "cm")) +
-
-annotate(x=0, xend=0, y=0, yend=1, colour="black", lwd=0.75, geom="segment") +
-
-xlab("Year") +
-
-ylab("Proportion ancestor contribution to population")
-
-#dev.off()
-
-#######
-
-# average and maximum contributions of specific lineages
-
-# RLKS-K from 2008-2022
-mean(as.matrix(pop.pfocal[which(pop.pfocal$ID == "RLS-K"),which(colnames(pop.pfocal) == "cohort.2008"):which(colnames(pop.pfocal) == "cohort.2022")])) # mean
-# [1] 0.1339778 # mean
-sd(as.matrix(pop.pfocal[which(pop.pfocal$ID == "RLS-K"),which(colnames(pop.pfocal) == "cohort.2008"):which(colnames(pop.pfocal) == "cohort.2022")])) # stanard deviation
-# [1] 0.03263044 # standard deviation
-max(as.matrix(pop.pfocal[which(pop.pfocal$ID == "RLS-K"),which(colnames(pop.pfocal) == "cohort.2008"):which(colnames(pop.pfocal) == "cohort.2022")])) # max
-#[1] 0.1730849 # max
-
-# WSA-K from 2008-2022
-mean(as.matrix(pop.pfocal[which(pop.pfocal$ID == "WSA-K"),which(colnames(pop.pfocal) == "cohort.2008"):which(colnames(pop.pfocal) == "cohort.2022")])) # mean
-# [1] 0.1041607 # mean
-sd(as.matrix(pop.pfocal[which(pop.pfocal$ID == "WSA-K"),which(colnames(pop.pfocal) == "cohort.2008"):which(colnames(pop.pfocal) == "cohort.2022")])) # standard deviation
-# [1] 0.03203001 # standard deviation
-max(as.matrix(pop.pfocal[which(pop.pfocal$ID == "WSA-K"),which(colnames(pop.pfocal) == "cohort.2008"):which(colnames(pop.pfocal) == "cohort.2022")])) # max
-# [1] 0.149241 # max
-
-# mean contribution for all individuals since 2008
-avg.contribution <- NULL
-for (id in pop.pfocal$ID) {
-	val <- mean(as.matrix(pop.pfocal[which(pop.pfocal$ID == id),which(colnames(pop.pfocal) == "cohort.2008"):which(colnames(pop.pfocal) == "cohort.2022")]), na.rm=TRUE)
-	avg.contribution <- rbind(avg.contribution, data.frame(ID=id, AVG_PROPORTION=val))
-}
-
-avg.contribution <- avg.contribution[order(-avg.contribution$AVG_PROPORTION),]
-
-#> head(avg.contribution, n=16)
-#      ID AVG_PROPORTION
-#44 RLS-K     0.13397785
-#5  WSA-K     0.10416071
-#46 OK-RS     0.05648191
-#22 K-SLA     0.05161644
-#60 SK-RG     0.04947236
-#53 BK-FS     0.04824063
-#45 BK-AS     0.04575711
-#1  SR-PK     0.04531992
-#8  K-RSW     0.03753052
-#40 BK-LS     0.03660300
-#4  WSF-K     0.03217750
-#23 K-SBF     0.02936139
-#14 LK-SG     0.02834174
-#17 AK-SP     0.02629410
-#7  K-GSW     0.02488999
-#66 F-BPS     0.02471368
-
-# average collective contribution of RLS-K and WSA-K since 2008
-rlsk.idx = which(pop.pfocal$ID == "RLS-K")
-wsak.idx = which(pop.pfocal$ID == "WSA-K")
-comb.contribution <- NULL
-for (tidx in which(colnames(pop.pfocal) == "cohort.2008"):which(colnames(pop.pfocal) == "cohort.2022")) {
-	comb.contribution = c(comb.contribution,pop.pfocal[rlsk.idx,tidx] + pop.pfocal[wsak.idx,tidx])
-}
-mean(comb.contribution)
-# [1] 0.2381386 # mean
-sd(comb.contribution)
-#[1] 0.06403289 # standard deviation
-max(comb.contribution)
-#[1] 0.322263 # max
-
-# assess relationship between RLS-K and K-SLA
-rmat <- read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/cr_ped_20230512_relatedness_matrix.txt',head=TRUE)
-rmat[which(colnames(rmat) == "RLS.K"),which(colnames(rmat) == "K.SLA")]
-# [1] 0.125 # r between RLS-K and K-SLA
-
-# find all translocated relatives of RLS-K
-trans <- read.csv('/home/tyler/Dropbox/research/jay/mosaic/metadata/Translocated_Jay_Individual_Statistics.tsv',head=TRUE,sep="\t")
-rlsk.relatives <- colnames(rmat)[which(rmat[which(colnames(rmat) == "RLS.K"),] > 0)]
-trans.id <- gsub("-",".",trans$COLOR_ID)
-rlsk.relatives.trans <- rlsk.relatives[rlsk.relatives %in% trans.id]
-#> rlsk.relatives.trans
-#[1] "RLS.K" "SK.RG" "SK.RB" "SK.RP" "SRR.K" "K.SAP" "K.SLA" "K.SPR" "K.SAG"
-
-# Proportion of genomic copies contributed by the top 16 contributors in 2022
-
-ntop = 16
-# pop.pfocal row indices of the top contributors in 2022 
-topidx = unname(sapply(pop.pfocal[order(-pop.pfocal$cohort.2022),1][1:ntop],function(x,df){which(df$ID == x)},df=pop.pfocal))
-# calculate the sum of the top contributor's genomic contribution for each year
-top.contribution <- NULL
-for (i in 1:length(time.periods)) {
-	top.contribution <- rbind(top.contribution, data.frame(YEAR=time.periods[i], PROPORTION_GENOMIC_COPIES = sum(pop.pfocal[topidx,i+1], na.rm=TRUE)))
-}
-
-#> top.contribution
-#   YEAR PROPORTION_GENOMIC_COPIES
-#1  2002                 0.2500000
-#2  2003                 0.2000000
-#3  2004                 0.1707317
-#4  2005                 0.3076927
-#5  2006                 0.4999996
-#6  2007                 0.5270272
-#7  2008                 0.6368874
-#8  2009                 0.7583543
-#9  2010                 0.6504852
-#10 2011                 0.6963268
-#11 2012                 0.6982892
-#12 2013                 0.6773675
-#13 2014                 0.7156768
-#14 2015                 0.7716050
-#15 2016                 0.7612648
-#16 2017                 0.7900778
-#17 2018                 0.8003363
-#18 2019                 0.8580870
-#19 2020                 0.8346470
-#20 2021                 0.8618459
-#21 2022                 0.8802618
-
-# minimum contribution since 2015
-min(top.contribution[which(top.contribution$YEAR == 2015):nrow(top.contribution),2])
-# [1] 0.7612648
-
-## Stacked barplot of contribution to population relative to other ancestors
-
-# color top 10 contributors
-
-topN = 10
-grp.idx <- list()
-grp.id <- NULL
-member.id <- list()
-
-for (i in id.sort[1:topN]) {
-	member.id <- c(member.id, i)
-	grp.id <- c(grp.id, i)
-	grp.idx <- c(grp.idx, which(pop.pfocal$ID == i))
-}
-
-# get index of all other translocated and resident individuals
-grp.id <- c(grp.id,"other_translocated")
-grp.idx[[topN+1]] <- which(pop.pfocal$ltype == 1 & pop.pfocal$ID %in% id.sort[1:topN] == FALSE)
-member.id[[topN+1]] <- pop.pfocal$ID[grp.idx[[topN+1]]]
-
-grp.id <- c(grp.id,"other_resident")
-grp.idx[[topN+2]] <- which(pop.pfocal$ltype == 2 & pop.pfocal$ID %in% id.sort[1:topN] == FALSE)
-member.id[[topN+2]] <- pop.pfocal$ID[grp.idx[[topN+2]]]
-
-# calculate proportion group contribution to population
-pop.pgroup <- NULL
-for (j in 2:((ncol(pop.pfocal))-4)) {
-	x <- NULL
-	for (i in 1:length(grp.idx)) {
-		x <- c(x,sum(pop.pfocal[grp.idx[[i]],j],na.rm=TRUE))
-	}
-	x.df <- data.frame(x)
-	if (is.null(pop.pgroup) == TRUE) pop.pgroup = x.df else pop.pgroup <- cbind(pop.pgroup, x.df)
-}
-colnames(pop.pgroup) <- colnames(pop.pfocal)[2:((ncol(pop.pfocal))-4)]
-pop.pgroup <- cbind(data.frame(ID=grp.id),pop.pgroup)
-
-# stacked barplot of group contributions
-barcol <- c(unname(sapply(pop.pgroup$ID[1:topN],function(x,df){df$color[which(df$ID == x)]},df=pop.pfocal)), "gray40", "gray70")
-
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/T_IE_pop_contribution_pfocal_barplot.png',width=16, height=7, units='in', res=300)
-x11(width=16,height=7)
-par(mgp = c(2.8,1,0))
-barplot(as.matrix(pop.pgroup[2:ncol(pop.pgroup)]), names.arg=time.periods, border=NA, col=barcol, xlab="Year", ylab="Proportion ancestor contribution", cex.names=1.27, cex.axis=1.3, cex.lab=1.5)
-#dev.off()
-
-# alternatively, make stacked barplot where each individual is a box and color by group using gradients and distinct colors
-topid <- pop.pfocal$ID[topidx] # these are the individuals that contributed >75% ancestry to the CR population since 2015
-#topid
-# [1] "RLS-K" "WSA-K" "K-SLA" "OK-RS" "SK-RG" "BK-FS" "K-RSW" "K-SBF" "SR-PK"
-# [10] "BK-LS" "K-GSW" "WSF-K" "LK-SG" "BK-AS" "WK-LS" "F-BPS
-
-# set groups for barplot coloring
-
-pop.pgroup2 <- pop.pfocal[,1:22]
-pop.pgroup2$biotype = unname(sapply(pop.pgroup2$ID, function(x,df){idx=which(df$COLOR_ID == x); btype=df$Biological_Origin_Status[idx];ifelse(btype == "T", "Trans", "Res")},df=meta))
-
-pop.pgroup2$bargrp <- pop.pgroup2$biotype
-pop.pgroup2$bargrp[which(pop.pgroup2$ID %in% topid == TRUE)] <- "top"
-
-# sort by descending contribution to 2022 within groups
-pop.pgroup2$bargrp <- factor(pop.pgroup2$bargrp,levels=c("top","Trans","Res"),ordered=TRUE)
-pop.pgroup2 <- pop.pgroup2[order(pop.pgroup2$bargrp,-pop.pgroup2$cohort.2022),]
-
-# color top individuals
-
-pop.pgroup2$barcol <- pop.pfocal$ID
-pop.pgroup2$barcol[which(pop.pgroup2$ID == "RLS-K")] <- "red3"
-pop.pgroup2$barcol[which(pop.pgroup2$ID == "WSA-K")] <- "blue1"
-pop.pgroup2$barcol[which(pop.pgroup2$ID == "K-SLA")] <- "cyan"
-pop.pgroup2$barcol[which(pop.pgroup2$ID == "OK-RS")] <- "steelblue1"
-pop.pgroup2$barcol[which(pop.pgroup2$ID == "SK-RG")] <- "darkorange"
-pop.pgroup2$barcol[which(pop.pgroup2$ID == "BK-FS")] <- "indianred4"
-pop.pgroup2$barcol[which(pop.pgroup2$ID == "K-RSW")] <- "peru"
-pop.pgroup2$barcol[which(pop.pgroup2$ID == "K-SBF")] <- "tan"
-pop.pgroup2$barcol[which(pop.pgroup2$ID == "SR-PK")] <- "purple"
-pop.pgroup2$barcol[which(pop.pgroup2$ID == "BK-LS")] <- "mediumpurple1"
-pop.pgroup2$barcol[which(pop.pgroup2$ID == "K-GSW")] <- "plum2"
-pop.pgroup2$barcol[which(pop.pgroup2$ID == "WSF-K")] <- "magenta"
-pop.pgroup2$barcol[which(pop.pgroup2$ID == "LK-SG")] <- "deeppink3"
-pop.pgroup2$barcol[which(pop.pgroup2$ID == "BK-AS")] <- "hotpink"
-pop.pgroup2$barcol[which(pop.pgroup2$ID == "WK-LS")] <- "darkmagenta"
-pop.pgroup2$barcol[which(pop.pgroup2$ID == "F-BPS")] <- "darkblue"
-
-# gradient color remaining translocated individuals
-trans.col.vec = NULL
-trans.col="gold2"
-trans.idx <- which(pop.pgroup2$bargrp == "Trans")
-step = 1/(length(trans.idx)+10)
-c = 1;
-for (i in trans.idx) {
-	pop.pgroup2$barcol[i] <- alpha(trans.col,c)
-	trans.col.vec <- c(trans.col.vec,pop.pgroup2$barcol[i])
-	c = c-step
-}
-
-# gradient color for remaining resident individuals
-res.col.vec = NULL
-res.col="gray30"
-res.idx <- which(pop.pgroup2$bargrp == "Res")
-step = 1/(length(res.idx)+5)
-c = 1;
-for (i in res.idx) {
-        pop.pgroup2$barcol[i] <- alpha(res.col,c)
-	res.col.vec <- c(res.col.vec,pop.pgroup2$barcol[i])
-        c = c-step
-}
-
-# convert data.frame into matrix for plotting
-#pop.pgroup2.mat <- as.matrix(pop.pgroup2[,2:22])
-pop.pgroup2.mat <- as.matrix(pop.pgroup2[,3:22]) # excludes 2002
-pop.pgroup2.mat[which(is.na(pop.pgroup2.mat))] <- 0
-
-# barplot
-x11(width=16,height=7)
-par(mgp = c(2.8,1,0))
-#barplot(pop.pgroup2.mat, names.arg=time.periods, border="black", col=pop.pgroup2$barcol, xlab="Year", ylab="Proportion ancestor contribution", cex.names=1.27, cex.axis=1.3, cex.lab=1.5)
-barplot(pop.pgroup2.mat, names.arg=time.periods2, border="black", col=pop.pgroup2$barcol, xlab="Year", ylab="Proportion ancestor contribution", cex.names=1.27, cex.axis=1.3, cex.lab=1.5) # exclude 2002
-
-# gradient color box for legend
-
-trans.col.width = seq(from=0,to=1,by=(1/length(trans.col.vec)))
-res.col.width = seq(from=0,to=1,by=(1/length(res.col.vec)))
-
-X11()
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/T_IE_pop_contribution_pfocal_barplot_key.png', width=7, height=7, units='in', res=300)
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/figures/T_IE_pop_contribution_pfocal_barplot_key.pdf', width=7, height=7)
-#plot.new()
-
-yb = 0.1
-yt = 0.3
-plot(1, type="n", xlab="", ylab="", xlim=c(-0.05,1.05), ylim=c(-0.05,1.05))
-for (i in 1:(length(trans.col.width)-1)) {
-	xs = trans.col.width[i]
-	xe = trans.col.width[i+1]
-	rect(xleft=xs, xright=xe, ybottom=yb, ytop=yt, border="gray50", lwd=0.3, col=trans.col.vec[i])
-}
-rect(xleft=trans.col.width[1], xright=trans.col.width[length(trans.col.width)], ybottom=yb, ytop=yt, border="gray20", lwd=1, col=NA)
-
-res.col.width = seq(from=0,to=1,by=(1/length(res.col.vec)))
-yb = 0.5
-yt = 0.7
-for (i in 1:(length(res.col.width)-1)) {
-        xs = res.col.width[i]
-        xe = res.col.width[i+1]
-        rect(xleft=xs, xright=xe, ybottom=yb, ytop=yt, border="gray10", lwd=0.3, col=res.col.vec[i])
-}
-rect(xleft=res.col.width[1], xright=res.col.width[length(res.col.width)], ybottom=yb, ytop=yt, border="gray20", lwd=1, col=NA)
-
-#dev.off()
-
-# ggplot stacked barplot version to accommodate pattern
-library(ggpattern)
-
-#nyears = length(time.periods)
-nyears = length(time.periods2)
-
-years.vec <- NULL
-#for (i in time.periods) { years.vec <- c(years.vec,rep(i,nrow(pop.pgroup2))) }
-for (i in time.periods2) { years.vec <- c(years.vec,rep(i,nrow(pop.pgroup2))) }
-
-contribution.p = NULL
-for (i in 1:ncol(pop.pgroup2.mat)) {contribution.p <- c(contribution.p, unname(pop.pgroup2.mat[,i]))}
-
-pat <- replace(pop.pgroup2$biotype, which(pop.pgroup2$biotype == "Res"), "stripe")
-pat <- replace(pat, which(pat != "stripe"), "none")
-
-pop.pgroup3 <- data.frame(year=years.vec, ID=rep(pop.pgroup2$ID,nyears), proportion=contribution.p, color=rep(pop.pgroup2$barcol,nyears), pattern=rep(pat,nyears))
-pop.pgroup3$year <- as.factor(pop.pgroup3$year) # need to do this for proper x-axis labels
-
-pat.shift = NULL
-xshift=0
-pstep = 1/length(which(pat=="stripe"))
-for (i in pat) {
-	if (i == "stripe") {
-		xshift = xshift + pstep
-		pat.shift = c(pat.shift,xshift)
-	} else pat.shift = c(pat.shift,0)
-}
-
-# begin plot
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/T_IE_pop_contribution_pfocal_barplot.png',width=16, height=7, units='in', res=300)
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/T_IE_pop_contribution_pfocal_barplot_2003_2022.png',width=16, height=7, units='in', res=300)
-x11(width=16,height=7)
-ggplot(pop.pgroup3, aes(fill=ID, y=proportion, x=year)) +
-
-theme_classic() +
-
-geom_bar_pattern(position="stack", stat="identity", pattern=pop.pgroup3$pattern, pattern_fill = "black", fill=pop.pgroup3$color, linewidth=0.5, color="black",
-pattern_spacing = 0.012, pattern_density=0.05, pattern_size=0.45, pattern_yoffset=rep(pat.shift,nyears)) +
-
-#geom_bar(position="stack", stat="identity", fill=pop.pgroup3$color, linewidth=0.5, color="black", width=0.83) + # for testing purposes - no pattern
-
-theme(legend.position="none", axis.text.x = element_text(size=17, color="black",vjust=4), axis.text.y = element_text(size=17, color="black"), axis.ticks.x=element_blank(),
-axis.title.x=element_text(size = 20, color="black", vjust=2), axis.title.y=element_text(size = 20, color="black",vjust=2), axis.line.x=element_blank(), axis.line.y=element_blank(), 
-axis.ticks.length.y=unit(0.25, "cm")) +
-
-annotate(x=0, xend=0, y=0, yend=1, colour="black", lwd=0.75, geom="segment") +
-
-xlab("Year") +
-
-ylab("Proportion ancestor contribution to population")
-
-#dev.off()
-
-# stacked area chart of contributing ancestors with individual ancestor lines (ignore warnings)
-
-pop.pfocal$lstr <- replace(pop.pfocal$ltype,which(pop.pfocal$ltype == 1), "solid")
-pop.pfocal$lstr <- replace(pop.pfocal$lstr,which(pop.pfocal$ltype == "2"), "dashed")
-pop.pfocal$lw2 <- replace(pop.pfocal$lw,which(pop.pfocal$lw == 2), 0.75)
-pop.pfocal$lw2 <- replace(pop.pfocal$lw2,which(pop.pfocal$lw2 == 1), 0.50)
-
-
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/T_IE_population_number_ancestors_area_chart_v2.png',width=16, height=7, units='in', res=300)
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/T_IE_population_number_ancestors_area_chart_v3.png',width=16, height=7, units='in', res=300) # offset x-axis title
-x11(width=16,height=7)
-
-gg.pop <- ggplot(anc.df.sub, aes(x=year, y=N, fill=count)) +
-
-theme_classic() +
-
-geom_area(position="identity") +
-
-coord_cartesian(xlim=c(2003,2022),ylim=c(0,75)) +
-
-scale_fill_manual(values=c(alpha("gray70",0.6),alpha("gray40",0.6))) +
-
-scale_x_continuous(breaks=time.periods2) +
-
-scale_y_continuous(name="Number ancestors", breaks=seq(from=0,to=75,by=5), sec.axis=sec_axis(~./75*prop.cutoff, name="Proportion ancestor contribution to population", 
-breaks=seq(from=0,to=prop.cutoff,by=0.02), )) +
-
-theme(legend.position="none", axis.text.x = element_text(size=17,color="black"), axis.ticks.length.x=unit(0.25,"cm"), axis.title.x=element_text(size=20, color="black", hjust=0.8),
-axis.text.y = element_text(size=17,color="black"), axis.ticks.length.y=unit(0.25,"cm"),axis.title.y=element_text(size=20,color="black", vjust=1.5),
-axis.title.y.right = element_text(size=20, color="black", vjust=1.5)) +
-
-xlab("Year")
-
-for (k in 1:nrow(pop.pfocal)) {
-	tmpvec <- NULL
-	for (j in 3:22) { tmpvec <- c(tmpvec,c(pop.pfocal[k,j],NA)) }
-	gg.pop <- gg.pop + geom_line(aes_string(y=tmpvec*(75/prop.cutoff)), color=pop.pfocal$color[k], linetype=pop.pfocal$lstr[k], lwd=pop.pfocal$lw2[k])
-}
-
-gg.pop
-
-#dev.off()
-
-# proportion with respect to maximum ancestor pop contribution (Hunter normalization) plot
-
-# get ID of top contributors to 2022 cohort
-id.sort.hunter <- pop.pmax$ID[order(-pop.pmax$cohort.2022)] # individuals ordered by contribution in 2022
-pop.pmax$rank.2022 <- match(pop.pmax$ID,id.sort.hunter)
-
-#> id.sort.hunter[1:10]
-# [1] "BK-LS" "RLS-K" "OK-RS" "K-RSW" "WSA-K" "K-SLA" "BK-AS" "SK-RG" "BK-FS"
-#[10] "WK-LS"
-
-# set colors for individuals (lines) of interest (top 10 contributors to 2022 cohort)
-pop.pmax$color <- "gray30"
-pop.pmax$color[which(pop.pmax$ID == "RLS-K")] <- "red"
-pop.pmax$color[which(pop.pmax$ID == "WSA-K")] <- "purple"
-pop.pmax$color[which(pop.pmax$ID == "K-SLA")] <- "cyan"
-pop.pmax$color[which(pop.pmax$ID == "OK-RS")] <- "orange"
-pop.pmax$color[which(pop.pmax$ID == "SK-RG")] <- "magenta"
-pop.pmax$color[which(pop.pmax$ID == "BK-FS")] <- "royalblue1"
-pop.pmax$color[which(pop.pmax$ID == "K-RSW")] <- "turquoise3"
-pop.pmax$color[which(pop.pmax$ID == "BK-AS")] <- "yellow3"
-pop.pmax$color[which(pop.pmax$ID == "BK-LS")] <- "blue"
-pop.pmax$color[which(pop.pmax$ID == "WK-LS")] <- "salmon2" # individual not among top 10 in focal ancestor normalization
-
-# set line width
-pop.pmax$lw = 1
-pop.pmax$lw[which(pop.pmax$ID == "RLS-K")] <- 2
-pop.pmax$lw[which(pop.pmax$ID == "WSA-K")] <- 2
-pop.pmax$lw[which(pop.pmax$ID == "K-SLA")] <- 2
-pop.pmax$lw[which(pop.pmax$ID == "OK-RS")] <- 2
-pop.pmax$lw[which(pop.pmax$ID == "SK-RG")] <- 2
-pop.pmax$lw[which(pop.pmax$ID == "BK-FS")] <- 2
-pop.pmax$lw[which(pop.pmax$ID == "K-RSW")] <- 2
-pop.pmax$lw[which(pop.pmax$ID == "BK-AS")] <- 2
-pop.pmax$lw[which(pop.pmax$ID == "BK-LS")] <- 2
-pop.pmax$lw[which(pop.pmax$ID == "WK-LS")] <- 2
-
-# set line type according to resident vs translocated
-pop.pmax$ltype <- unname(sapply(id,function(x,df){df$Biological_Origin_Status}[which(df$COLOR_ID == x)],df=meta))
-pop.pmax$ltype[which(pop.pmax$ltype == "T" | pop.pmax$ltype == "Donor_Population")] <- 1
-pop.pmax$ltype[which(pop.pmax$ltype == "IE" | pop.pmax$ltype == "LR")] <- 2
-pop.pmax$ltype <- as.numeric(pop.pmax$ltype)
-
-# plot proportion of focal ancestor contributions over time
-
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/T_IE_pop_contribution_pmax.png',width=16, height=7, units='in', res=300)
-x11(width=16,height=7)
-par(mgp = c(2.75,1,0))
-plot(1, type="n", xlim=c(time.periods[1],time.periods[length(time.periods)]), ylim=c(0,max(pop.pmax[,tidx],na.rm=TRUE)+0.01),
-xlab="Year", ylab="Proportion ancestor contribution relative to pop max", main="",xaxt='n', cex.axis=1.3, cex.lab=1.5)
-axis(side=1,at=time.periods,labels=time.periods,cex=1.5,cex.axis=1.3)
-
-for (i in 1:nrow(pop.pmax)) {
-	# draw lines
-	lines(x=time.periods, y=pop.pmax[i,tidx],col=alpha(pop.pmax$color[i],0.6), lty=pop.pmax$ltype[i], lwd=pop.pmax$lw[i])
-}
-# plot mean line
-lines(x=time.periods, y=sapply(tidx,function(x,df){mean(df[,x],na.rm=TRUE)},df=pop.pmax), lty=6, col="black", lwd=2)
-
-# add legend
-legend('topleft',c("Translocated","Resident","Mean"),lty=c(1,2,6),bty='n',cex=1.3, lwd=1.7, seg.len=2.9)
-
-#dev.off()
-
---- end R code for T and IE temporal contributions to population ---
-
---- begin R code for T, IE, and I temporal contributions to population (TODO: RERUN ON NEW DATA) ---
-
-library(scales) # for alpha colors
-
-meta <- read.table("/home/tyler/Dropbox/research/jay/mosaic/metadata/jayid_map_20230512.txt",head=TRUE,sep="\t")
-fdir='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/pop_temporal/'
-ped <- read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/cr_ped_20230512.tsv', head=TRUE, na.strings='*')
-
-pop.n <- NULL # data frame of number of expected genomic copies
-pop.pfocal <- NULL # data frame of contributions normalized by focal ancestors
-pop.pmax <- NULL # data frame of contribution normalized by max cohort pop contribution
-
-# read in pedstat files for time points 2002-2022
-time.periods = 2002:2022
-tidx <- 2:(length(time.periods)+1) # these are the contribution columns in matrix
-id <- NULL
-for (t in time.periods) {
-	df <- read.table(paste0(fdir,'T_IE_I_20230512_',t,'_pop_contribution.pedstat1'),head=TRUE)
-	if (is.null(id)) id <- df[,1]
-	pop.n <- cbind(pop.n, df[,2])
-	pop.pfocal <- cbind(pop.pfocal, df[,3])
-	pop.pmax <- cbind(pop.pmax, df[,4])
-}
-
-# mask values of individuals if they weren't born
-ped.sub <- ped[which(ped$ID %in% id),c(1,5)]
-ped.sub <- ped.sub[match(id,ped.sub$ID),]
-for (i in 1:length(time.periods)) {
-	t = time.periods[i]
-	idx <- which(ped.sub$COHORT > t)
-	if (length(idx) > 0) {
-		pop.n[idx,i] <- NA
-		pop.pfocal[idx,i] <- NA
-		pop.pmax[idx,i] <- NA	
-	}
-}
-
-pop.n <- cbind(data.frame(ID=id),as.data.frame(pop.n)) # add sample names
-colnames(pop.n) <- c("ID",paste0("cohort.",time.periods))
-
-pop.pfocal <- cbind(data.frame(ID=id),as.data.frame(pop.pfocal)) # add sample names
-colnames(pop.pfocal) <- c("ID",paste0("cohort.",time.periods))
-
-pop.pmax <- cbind(data.frame(ID=id),as.data.frame(pop.pmax)) # add sample names
-colnames(pop.pmax) <- c("ID",paste0("cohort.",time.periods))
-
-# proportion with respect to focal ancestors plot
-
-# get ID of top contributors to 2022 cohort
-id.sort <- pop.pfocal$ID[order(-pop.pfocal$cohort.2022)] # individuals ordered by contribution in 2022
-pop.pfocal$rank.2022 <- match(pop.pfocal$ID,id.sort)
-
-# set colors for individuals (lines) of interest (top 10 contributors to 2022 cohort)
-pop.pfocal$color <- "gray30"
-pop.pfocal$color[which(pop.pfocal$ID == "RLS-K")] <- "red"
-pop.pfocal$color[which(pop.pfocal$ID == "WSA-K")] <- "purple"
-pop.pfocal$color[which(pop.pfocal$ID == "K-SLA")] <- "cyan"
-pop.pfocal$color[which(pop.pfocal$ID == "OK-RS")] <- "orange"
-pop.pfocal$color[which(pop.pfocal$ID == "PK-SG")] <- "cornflowerblue"
-pop.pfocal$color[which(pop.pfocal$ID == "PF-SH")] <- "darkcyan"
-pop.pfocal$color[which(pop.pfocal$ID == "SK-RG")] <- "magenta"
-pop.pfocal$color[which(pop.pfocal$ID == "BK-FS")] <- "royalblue1"
-pop.pfocal$color[which(pop.pfocal$ID == "RF-SF")] <- "burlywood3"
-pop.pfocal$color[which(pop.pfocal$ID == "K-RSW")] <- "turquoise3"
-
-# set line type according to resident vs translocated
-pop.pfocal$ltype <- unname(sapply(id,function(x,df){df$Biological_Origin_Status}[which(df$COLOR_ID == x)],df=meta))
-pop.pfocal$ltype[which(pop.pfocal$ltype == "T" | pop.pfocal$ltype == "Donor_Population")] <- 1
-pop.pfocal$ltype[which(pop.pfocal$ltype == "IE" | pop.pfocal$ltype == "LR")] <- 2
-pop.pfocal$ltype[which(pop.pfocal$ltype == "I")] <- 3
-pop.pfocal$ltype <- as.numeric(pop.pfocal$ltype)
-
-# set line width
-pop.pfocal$lw = 1
-pop.pfocal$lw[which(pop.pfocal$ltype == 3)] <- 1.8 # need to increase size of dots for visibility
-isize = 2.8
-pop.pfocal$lw[which(pop.pfocal$ID == "RLS-K")] <- 1.8
-pop.pfocal$lw[which(pop.pfocal$ID == "WSA-K")] <- 1.8
-pop.pfocal$lw[which(pop.pfocal$ID == "K-SLA")] <- 1.8
-pop.pfocal$lw[which(pop.pfocal$ID == "OK-RS")] <- 1.8
-pop.pfocal$lw[which(pop.pfocal$ID == "PK-SG")] <- isize # immigrant
-pop.pfocal$lw[which(pop.pfocal$ID == "PF-SH")] <- isize # immigrant
-pop.pfocal$lw[which(pop.pfocal$ID == "SK-RG")] <- 1.8
-pop.pfocal$lw[which(pop.pfocal$ID == "BK-FS")] <- 1.8
-pop.pfocal$lw[which(pop.pfocal$ID == "RF-SF")] <- isize # immigrant
-pop.pfocal$lw[which(pop.pfocal$ID == "K-RSW")] <- 1.8
-
-# plot proportion of focal ancestor contributions over time
-
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/pop_temporal/T_IE_I_20230512_pop_contributions.pdf', width=16, height=7)
-x11(width=16,height=7)
-par(mgp = c(2.75,1,0))
-plot(1, type="n", xlim=c(time.periods[1],time.periods[length(time.periods)]), ylim=c(0,max(pop.pfocal[,tidx],na.rm=TRUE)+0.05),
-xlab="Year", ylab="Proportion ancestor contribution to population", main="",xaxt='n', cex.axis=1.3, cex.lab=1.5)
-axis(side=1,at=time.periods,labels=time.periods,cex=1.5,cex.axis=1.3)
-
-for (i in 1:nrow(pop.pfocal)) {
-	# draw lines
-	lines(x=time.periods, y=pop.pfocal[i,tidx],col=alpha(pop.pfocal$color[i],0.6), lty=pop.pfocal$ltype[i], lwd=pop.pfocal$lw[i])
-}
-# plot mean line
-lines(x=time.periods, y=sapply(tidx,function(x,df){mean(df[,x],na.rm=TRUE)},df=pop.pfocal), lty=6, col="black", lwd=1.8)
-
-# add legend
-legend('topleft',c("Translocated","Resident","Immigrant","Mean"),lty=c(1,2,3,6),bty='n',cex=1.2)
-
-# proportion with respect to maximum ancestor pop contribution (Hunter normalization) plot
-
-# get ID of top contributors to 2022 cohort
-id.sort.hunter <- pop.pmax$ID[order(-pop.pmax$cohort.2022)] # individuals ordered by contribution in 2022
-pop.pmax$rank.2022 <- match(pop.pmax$ID,id.sort.hunter)
-
-# set colors for individuals (lines) of interest (top 10 contributors to 2022 cohort)
-pop.pmax$color <- "gray30"
-pop.pmax$color[which(pop.pmax$ID == "RLS-K")] <- "red"
-pop.pmax$color[which(pop.pmax$ID == "WSA-K")] <- "purple"
-pop.pmax$color[which(pop.pmax$ID == "OK-RS")] <- "orange"
-pop.pmax$color[which(pop.pmax$ID == "BK-LS")] <- "blue"
-pop.pmax$color[which(pop.pmax$ID == "K-SLA")] <- "cyan"
-pop.pmax$color[which(pop.pmax$ID == "SK-RG")] <- "magenta"
-pop.pmax$color[which(pop.pmax$ID == "BK-FS")] <- "royalblue1"
-pop.pmax$color[which(pop.pmax$ID == "PK-SG")] <- "cornflowerblue"
-pop.pmax$color[which(pop.pmax$ID == "SR-PK")] <- "red4"
-pop.pmax$color[which(pop.pmax$ID == "WK-LS")] <- "salmon2"
-
-# set line type according to resident vs translocated
-pop.pmax$ltype <- unname(sapply(id,function(x,df){df$Biological_Origin_Status}[which(df$COLOR_ID == x)],df=meta))
-pop.pmax$ltype[which(pop.pmax$ltype == "T" | pop.pmax$ltype == "Donor_Population")] <- 1
-pop.pmax$ltype[which(pop.pmax$ltype == "IE" | pop.pmax$ltype == "LR")] <- 2
-pop.pmax$ltype[which(pop.pmax$ltype == "I")] <- 3
-pop.pmax$ltype <- as.numeric(pop.pmax$ltype)
-
-# set line width
-pop.pmax$lw = 1
-pop.pmax$lw[which(pop.pmax$ltype == 3)] <- 1.8 # need to increase size of dots for visibility
-pop.pmax$lw[which(pop.pmax$ID == "RLS-K")] <- 1.8
-pop.pmax$lw[which(pop.pmax$ID == "WSA-K")] <- 1.8
-pop.pmax$lw[which(pop.pmax$ID == "OK-RS")] <- 1.8
-pop.pmax$lw[which(pop.pmax$ID == "BK-LS")] <- 1.8
-pop.pmax$lw[which(pop.pmax$ID == "K-SLA")] <- 1.8
-pop.pmax$lw[which(pop.pmax$ID == "SK-RG")] <- 1.8
-pop.pmax$lw[which(pop.pmax$ID == "BK-FS")] <- 1.8
-pop.pmax$lw[which(pop.pmax$ID == "PK-SG")] <- isize # immigrant
-pop.pmax$lw[which(pop.pmax$ID == "SR-PK")] <- 1.8
-pop.pmax$lw[which(pop.pmax$ID == "WK-LS")] <- 1.8
-
-# plot proportion of focal ancestor contributions over time
-
-x11(width=16,height=7)
-par(mgp = c(2.75,1,0))
-plot(1, type="n", xlim=c(time.periods[1],time.periods[length(time.periods)]), ylim=c(0,max(pop.pmax[,tidx],na.rm=TRUE)+0.05),
-xlab="Year", ylab="Proportion ancestor contribution relative to pop max", main="",xaxt='n', cex.axis=1.3, cex.lab=1.5)
-axis(side=1,at=time.periods,labels=time.periods,cex=1.5,cex.axis=1.3)
-
-for (i in 1:nrow(pop.pmax)) {
-	# draw lines
-	lines(x=time.periods, y=pop.pmax[i,tidx],col=alpha(pop.pmax$color[i],0.6), lty=pop.pmax$ltype[i], lwd=pop.pmax$lw[i])
-}
-# plot mean line
-lines(x=time.periods, y=sapply(tidx,function(x,df){mean(df[,x],na.rm=TRUE)},df=pop.pmax), lty=6, col="black", lwd=1.8)
-
-# add legend
-legend('topleft',c("Translocated","Resident","Immigrant","Mean"),lty=c(1,2,3,6),bty='n',cex=1.2)
-
---- end R code for T, IE, and I temporal contributions to population ---
+########## TL TODO END HERE
 
 ## Plots of expected genetic contribution through time to individuals born in a cohort
 
