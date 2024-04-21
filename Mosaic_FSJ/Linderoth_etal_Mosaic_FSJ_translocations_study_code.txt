@@ -3698,6 +3698,44 @@ rlsk.relatives.trans
 
 --- end R code for RLS-K relative assessment ---
 
+## Characterize ancestral contributions to the 2022 CR population
+
+--- begin R code for 2022 population contribution stats ---
+
+x2022 <- read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/pop_temporal/T_IE_20230512_2022_pop_contribution.pedstat1',head=TRUE)
+
+mean(x2022$P_ANC_FOCAL)
+#[1] 0.0135135 # average relative ancestral contribution
+
+length(which(x2022$P_ANC_FOCAL > mean(x2022$P_ANC_FOCAL)))
+[1] 22 # number of ancestors contributinig more than the average relative contribution 
+
+length(which(x2022$P_ANC_FOCAL > 2*mean(x2022$P_ANC_FOCAL)))
+[1] 11 # number of ancestors providing more than twice the average contribution
+ 
+mean(x2022$N_GENOME_COPIES)
+#[1] 1.338657 # expected number of genomic copies per ancestor in the 2022 CR population (average number of expected genomic copies) 
+
+x2022$N_GENOME_COPIES[which(x2022$ID == "RLS-K")]/mean(x2022$N_GENOME_COPIES)
+#[1] 10.59831 # contribution of RLS-K relative to the average ancestral contribution
+
+x2022$N_GENOME_COPIES[which(x2022$ID == "WSA-K")]/mean(x2022$N_GENOME_COPIES)
+#[1] 7.820377 # contribution of WSA-K relative to the average ancestal contribution
+
+length(which(x2022$N_GENOME_COPIES > 5*mean(x2022$N_GENOME_COPIES)))
+[1] 4 # number of ancestors providing more than 5x the average ancestral contribution
+
+x2022$N_GENOME_COPIES[which(x2022$ID == "K-SLA")]
+[1] 9.16406 # number expected genomic copies provided by K-SLA
+
+x2022$N_GENOME_COPIES[which(x2022$ID == "K-SLA")]/mean(x2022$N_GENOME_COPIES)
+#[1] 6.845714 # contribution of SLA-K relative to the average ancestral contribution
+
+x2022$N_GENOME_COPIES[which(x2022$ID == "OK-RS")]/mean(x2022$N_GENOME_COPIES)
+#[1] 5.252467 # contribution of OK-RS relative to the average ancestral contribution
+
+--- end R code for 2022 population contribution stats ---
+
 
 #
 #
@@ -3979,9 +4017,12 @@ ped1.sort$ID[order(ped1.sort$gen.rank)][1:10]
 #
 
 
-## ---------- DEMOGRAPHIC SIZE CHANGE ---------- ##
+## ---------- CENSUS SIZE ---------- ##
 
---- begin R code for number of T and IE contributing to each cohort and demographic expansion ---
+## Examine population size change and the number of resident and translocated
+## ancestral lineages contributing to the expected genetic makeup of CR local recruit cohorts over time.
+
+--- begin R code for demographic expansion ---
 
 library(scales)
 library(TeachingDemos) # for shadowtext
@@ -3996,7 +4037,7 @@ trans_data <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/Trans
 
 pop.n <- NULL # data frame of number of expected genomic copies in population
 cohort.n <- NULL # data frame of number of expecteed genomic copies contributed to cohort
-cohort.n.adj <- NULL # data frame of number of expected genomic copies contributed to cohort minus self-contribution (due to LR ancestors)
+cohort.n.adj <- NULL # data frame of number of expected genomic copies contributed to cohort minus self-contribution (due to some ancestors being local recruits, LRs)
 
 # read in pedstat files for time points 2002-2022
 time.periods = 2002:2022
@@ -4062,7 +4103,9 @@ meta.sub <- meta.sub[match(cohort.n$ID,meta.sub$COLOR_ID),]
 tidx <- which(meta.sub$Biological_Origin_Status == "T")
 ridx <- which(meta.sub$Biological_Origin_Status == "IE" | meta.sub$Biological_Origin_Status == "LR")
 
-# counts contributors to cohorts
+## Track number of genetically contributing ancestral lineages to the CR population and cohorts over time.
+
+# count number of ancestral lineages contributing to cohorts over time
 
 n.contributors <- NULL
 for (j in 4:ncol(cohort.n)) {
@@ -4072,7 +4115,7 @@ for (j in 4:ncol(cohort.n)) {
 	n.contributors <- rbind(n.contributors, data.frame(YEAR=time.periods[j-1], N_CONTRIBUTORS = anc.n, N_RES = res.n, N_TRANS = trans.n))
 }
 
-#> n.contributors # This is the the number of ancestral lineages present among cohorts born each year
+n.contributors # This is the number of ancestral lineages represented among CR cohorts born each year
 #   YEAR N_CONTRIBUTORS N_RES N_TRANS
 #1  2004             15    14       1
 #2  2005              2     1       1
@@ -4102,6 +4145,28 @@ for (j in 4:ncol(cohort.n.adj)) {
 	n.contributors.adj <- rbind(n.contributors.adj, data.frame(YEAR=time.periods[j-1], N_CONTRIBUTORS = anc.n, N_RES = res.n, N_TRANS = trans.n))
 }
 
+n.contributors.adj # This is the number of ancestral lineages represented among CR cohorts born each year excluding self-counting LRs considered to be contemporary CR ancestors
+#   YEAR N_CONTRIBUTORS N_RES N_TRANS
+#1  2004             10     9       1
+#2  2005              2     1       1
+#3  2006              2     1       1
+#4  2007              4     2       2
+#5  2008              8     3       5
+#6  2009              9     3       6
+#7  2010             16     4      12
+#8  2011             22     3      19
+#9  2012             18     3      15
+#10 2013             23     4      19
+#11 2014              9     3       6
+#12 2015             11     3       8
+#13 2016             24     3      21
+#14 2017             23     3      20
+#15 2018             21     3      18
+#16 2019             22     3      19
+#17 2020             23     3      20
+#18 2021             25     3      22
+#19 2022             24     3      21 
+
 
 # count ancestral lineages present in the population
 
@@ -4113,7 +4178,7 @@ for (j in 2:ncol(pop.n)) {
 	n.pop.lineages <- rbind(n.pop.lineages, data.frame(YEAR=time.periods[j-1], N_CONTRIBUTORS = anc.n, N_RES = res.n, N_TRANS = trans.n))
 }
 
-#> n.pop.lineages
+n.pop.lineages
 #   YEAR N_CONTRIBUTORS N_RES N_TRANS
 #1  2002              4     4       0
 #2  2003             20    13       7
@@ -4138,7 +4203,7 @@ for (j in 2:ncol(pop.n)) {
 #21 2022             25     3      22
 
 
-# translocations through time
+# make data.frame of number of translocated birds from 2003-2010 by donor site
 
 trans.df <- NULL
 for (t in sort(unique(trans_data$Year_Translocated))) {
@@ -4151,7 +4216,7 @@ for (t in sort(unique(trans_data$Year_Translocated))) {
 	trans.df <- rbind(trans.df, data.frame(YEAR=t, N_MOVED=n, SITE1_N = site1.n, SITE12_N = site12.n, SITE13_N = site13.n, SITE18_N = site18.n, TEXACO_N = tex.n))
 }
 
-#> trans.df
+trans.df
 #  YEAR N_MOVED SITE1_N SITE12_N SITE13_N SITE18_N TEXACO_N
 #1 2003       7       1        1        4        1        0
 #2 2004       6       2        2        2        0        0
@@ -4161,14 +4226,13 @@ for (t in sort(unique(trans_data$Year_Translocated))) {
 #6 2009       6       0        0        6        0        0
 #7 2010      10       0        0        0        0       10
 
-# population census size through time
+## Population census size through time.
 
 # format census data
 
 census.sub <- census[which(census$PROPERTY == "MW" | census$PROPERTY == "COKER" | census$PROPERTY == "DUETTE PRESERVE"),] # restrict census to Mosaic Wellfield, Duette Preserve, and the Coker Tract
 census.sub <- census.sub[which(census.sub$Present == 1),] # remove individuals not seen
 census.sub$COLOR_ID <- toupper(census.sub$COLOR_ID)
-#census.sub <- census.sub[-grep("UNBAND",census.sub$COLOR_ID),] # exclude unbanded individuals
 
 popsize <- NULL
 for (t in sort(unique(census.sub$CENSUS_YEAR))) {
@@ -4176,7 +4240,7 @@ for (t in sort(unique(census.sub$CENSUS_YEAR))) {
 	popsize <- rbind(popsize, data.frame(YEAR=t, CENSUS_N = n))
 }
 
-#> popsize
+popsize # census size
 #   YEAR CENSUS_N
 #1  2002        4
 #2  2003       20
@@ -4201,37 +4265,25 @@ for (t in sort(unique(census.sub$CENSUS_YEAR))) {
 #21 2022      134
 
 
-# plot census data
+## Plot population size change over time - Figure 1C
 
 # limit data to years 2003+ for plotting
 time.periods2 <- time.periods[2:length(time.periods)]
 popsize.sub <- popsize[which(popsize$YEAR > 2002),]
 
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/figures/temporal_census_size.pdf', width=16, height=7) # deprecated
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/figures/temporal_census_size.png', width=16, height=7, units='in', res=300) # deprecated
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/temporal_census_size.png', width=16, height=7, units='in', res=300) # counts self-contribution
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/figures/temporal_census_size.pdf', width=16, height=7) # counts self-contribution
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/temporal_census_size_adjusted.png', width=16, height=7, units='in', res=300) # does not count self-contribution
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/figures/temporal_census_size_adjusted.pdf', width=16, height=7) # does not count self-contribution
 #png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/temporal_census_size_adjusted_2003_2022.png', width=16, height=7, units='in', res=300) # does not count self-contribution
 x11(width=16,height=7)
 par(mgp = c(2.75,1,0))
-#plot(1, type="n", xlim=c(time.periods[1],time.periods[length(time.periods)]), ylim=c(0,max(popsize$CENSUS_N)+5),xlab="Year", ylab="Number individuals", main="",xaxt='n', cex.axis=1.3, cex.lab=1.5)
 plot(1, type="n", xlim=c(time.periods2[1]-0.5,time.periods2[length(time.periods2)]), ylim=c(0,max(popsize.sub$CENSUS_N)+5),xlab="Year", ylab="Number individuals", 
 main="",xaxt='n', cex.axis=1.3, cex.lab=1.5, xaxt='n')
-#axis(side=1,at=time.periods,labels=time.periods,cex=1.5,cex.axis=1.3)
 axis(side=1,at=time.periods2,labels=time.periods2,cex=1.5,cex.axis=1.3)
 axis(side=2,at=seq(from=0,to=150,by=25),labels=seq(from=0,to=150,by=25),cex=1.5,cex.axis=1.3)
 
-#lines(x=popsize$YEAR, y=popsize$CENSUS_N, lwd=2)
-#points(x=popsize$YEAR, y=popsize$CENSUS_N, pch=21, bg=alpha("black",0.5), col="black", cex=1.7, lwd=2)
 lines(x=popsize.sub$YEAR, y=popsize.sub$CENSUS_N, lwd=2)
 points(x=popsize.sub$YEAR, y=popsize.sub$CENSUS_N, pch=21, bg=alpha("black",0.5), col="black", cex=1.7, lwd=2)
 
-# add arrows for translocations
+# add arrows to denote translocations
 for (t in trans.df$YEAR) {
-	#idx = which(popsize$YEAR == t)
-	#y = popsize$CENSUS_N[idx]
 	idx = which(popsize.sub$YEAR == t)
 	y = popsize.sub$CENSUS_N[idx]
 	n = trans.df$N_MOVED[which(trans.df$YEAR == t)]
@@ -4239,40 +4291,21 @@ for (t in trans.df$YEAR) {
 	text(x=t, y=y+42, labels=n, cex=1.5)
 }
 
-#rect(xleft=2001.6, ybottom=42, xright=2003.6, ytop=48.5, col="white", border=NA)
-#text(x=2002.29, y=52, labels="Number", cex=1.3)
-#text(x=2002.6, y=46, labels="translocated", cex=1.3)
-
 rect(xleft=2002.6, ybottom=38, xright=2003.6, ytop=50, col="white", border=NA)
 text(x=2002.8, y=47, labels="Number", cex=1.3)
 text(x=2002.8, y=41, labels="translocated", cex=1.3)
 
-# add number of unadjusted Residents contributing to cohorts
-#res.offset= -0.75
-#lines(x=n.contributors$YEAR, y=n.contributors$N_RES, col=alpha("palevioletred3",0.6), lwd=2, lty=5)
-#text(x=n.contributors$YEAR, y=n.contributors$N_RES+res.offset, labels=n.contributors$N_RES, col="palevioletred3", cex=1.5, font=2) # use font=2 for bold
-
-# add number unadjusted Translocaed contributing to cohort
-#trans.offset = 0.75
-#lines(x=n.contributors$YEAR, y=n.contributors$N_TRANS, col=alpha("royalblue",0.6), lwd=2, lty=5)
-#text(x=n.contributors$YEAR, y=n.contributors$N_TRANS+trans.offset, labels=n.contributors$N_TRANS, col="royalblue",cex=1.5, font=2) # use font=2 for bold
-
-# add number of adjusted Residents contributing to cohorts (discounts self-contribution)
+# add number of adjusted Resident ancestors contributing to cohorts (discounts self-contribution)
 res.offset= -0.75
 lines(x=n.contributors.adj$YEAR, y=n.contributors.adj$N_RES, col=alpha("palevioletred3",0.6), lwd=2, lty=5)
 text(x=n.contributors.adj$YEAR, y=n.contributors.adj$N_RES+res.offset, labels=n.contributors.adj$N_RES, col="palevioletred3", cex=1.5, font=2) # use font=2 for bold
 
-# add number adjusted Translocaed contributing to cohort (discounts self contribution)
+# add number adjusted Translocated ancestors contributing to cohorts (discounts self contribution)
 trans.offset = 0.75
 lines(x=n.contributors.adj$YEAR, y=n.contributors.adj$N_TRANS, col=alpha("royalblue",0.6), lwd=2, lty=5)
 text(x=n.contributors.adj$YEAR, y=n.contributors.adj$N_TRANS+trans.offset, labels=n.contributors.adj$N_TRANS, col="royalblue",cex=1.5, font=2) # use font=2 for bold
 
 # add legend
-#grid(nx=110, ny=50, lty=2) # for aligning things
-#legend(x=2001.2,y=157, legend="Population size", lty=1, lwd=2, col="black", bty='n', cex=1.3)
-#points(x=2001.76, y=149, pch=21, bg=alpha("black",0.5), col="black", cex=1.7, lwd=2)
-#legend(x=2005.2,y=157, legend="Resident contributors", lty=5, lwd=2, col="palevioletred3", bty='n', cex=1.3)
-#legend(x=2010.15,y=157, legend="Translocated contributors", lty=5, lwd=2, col="royalblue", bty='n', cex=1.3)
 
 legend(x=2002,y=157, legend="Population size", lty=1, lwd=2, col="black", bty='n', cex=1.3)
 points(x=2002.56, y=149, pch=21, bg=alpha("black",0.5), col="black", cex=1.7, lwd=2)
@@ -4281,159 +4314,4 @@ legend(x=2010.95,y=157, legend="Translocated contributors", lty=5, lwd=2, col="r
 
 #dev.off()
 
---- end R code for number of T and IE contributing to each cohort and demographic expansion ---
-
---- begin R code for 2022 population contribution stats ---
-
-x2022 <- read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/pop_temporal/T_IE_20230512_2022_pop_contribution.pedstat1',head=TRUE)
-
-mean(x2022$P_ANC_FOCAL)
-#[1] 0.0131579 # average relative ancestral contribution
-
-length(which(x2022$P_ANC_FOCAL > mean(x2022$P_ANC_FOCAL)))
-[1] 22 # number of ancestors contributinig more than the average relative contribution 
-
-length(which(x2022$P_ANC_FOCAL > 2*mean(x2022$P_ANC_FOCAL)))
-[1] 11 # number of ancestors providing more than twice the average contribution
- 
-mean(x2022$N_GENOME_COPIES)
-[1] 1.565867 # expected number of genomic copies per ancestor in the 2022 cohort (average number of expected genomic copies) 
-
-x2022$N_GENOME_COPIES[which(x2022$ID == "RLS-K")]/mean(x2022$N_GENOME_COPIES)
-[1] 11.18588 # contribution of RLK-K relative to the average ancestral contribution
-
-x2022$N_GENOME_COPIES[which(x2022$ID == "WSA-K")]/mean(x2022$N_GENOME_COPIES)
-[1] 8.12253 # contribution of WSA-K relative to the average ancestal contribution
-
-length(which(x2022$N_GENOME_COPIES > 5*mean(x2022$N_GENOME_COPIES)))
-[1] 4 # number of ancestors providing more than 5x the average ancestral contribution
-
-x2022$N_GENOME_COPIES[which(x2022$ID == "K-SLA")]
-[1] 10.4531 # number expected genomic copies provided by K-SLA
-
-x2022$N_GENOME_COPIES[which(x2022$ID == "K-SLA")]/mean(x2022$N_GENOME_COPIES)
-[1] 6.6756 # contribution of SLA-K relative to the average ancestral contribution
-
-x2022$N_GENOME_COPIES[which(x2022$ID == "OK-RS")]/mean(x2022$N_GENOME_COPIES)
-[1] 5.807487 # contribution of OK-RS relative to the average ancestral contribution
-
---- end R code for 2022 population contribution stats ---
-
---- begin R code for relatedness between breeding pairs ---
-
-library(scales)
-
-ped <- read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/mosaic_ped_20230512.tsv', head=TRUE, na.strings='*')
-nesting <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/20230512_metadata/CUMULATIVE_NESTING_DATA_FINAL_05122023.tsv',head=TRUE,sep="\t")
-rmat.ped <- as.matrix(read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/mosaic_ped_20230512_relatedness_matrix.txt',head=TRUE))
-rmat.gen <- as.matrix(read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix_relateStats_input.txt', head=TRUE))
-jayid <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/jayid_map_20230512.txt', head=TRUE, sep="\t")
-
-# format nesting data
-nesting$Property <- toupper(nesting$Property)
-nesting$Breeding_Male <- toupper(nesting$Breeding_Male)
-nesting$Breeding_Female <- toupper(nesting$Breeding_Female)
-exidx <- c(grep(paste(c("NONE","UNBAND","UNBD","UNB","NOBAND","UNKNOWN"),collapse="|"), nesting$Breeding_Male), grep(paste(c("NONE","UNBAND","UNBD","UNB","NOBAND","UNKNOWN"),collapse="|"), nesting$Breeding_Female))
-nest.sub <- nesting[-exidx,]
-nest.sub <- nest.sub[-which(nest.sub$ERROR_FLAG == 1),]
-nest.sub <- nest.sub[which(nest.sub$Property == "MW" | nest.sub$Property == "COKER" | nest.sub$Property == "DUETTE"),]
-nest.sub$Number_Fledged[which(nest.sub$Number_Fledged == "FAILED" | nest.sub$Number_Fledged == "ABANDONED")] <- 0
-nest.sub$Number_Fledged[which(nest.sub$Number_Fledged == "UNKNOWN")] <- NA
-nest.sub$Number_Fledged <- as.numeric(nest.sub$Number_Fledged)
-
-# format pedigree relatedness matrix
-colnames(rmat.ped) <- gsub(".","-",colnames(rmat.ped), fixed=TRUE)
-rownames(rmat.ped) <- colnames(rmat.ped)
-
-# format genetic relatedness matrix
-colnames(rmat.gen) <- unname(sapply(colnames(rmat.gen),function(x,df){id = df$COLOR_ID[which(df$LAB_ID == x)]; ifelse(id == "*", x, id)},df=jayid))
-rownames(rmat.gen) <- colnames(rmat.gen)
-
-# make dataframe of relatedness between pairs and the number of offspring fledged each year
-
-breeder.r <- NULL
-
-for (i in 1:nrow(nest.sub)) {
-	male <- nest.sub$Breeding_Male[i]
-	female <- nest.sub$Breeding_Female[i]
-	year <- nest.sub$YEAR[i]
-	nfledge <- nest.sub$Number_Fledged[i]
-	idx <- which(breeder.r$FATHER == male & breeder.r$MOTHER == female & breeder.r$YEAR == year)
-	if (length(idx) > 0) {
-		# pair attempt for current year has already been logged
-		if (nfledge > 0) {
-			if (is.na(breeder.r$NUM_FLEDGE[idx])) breeder.r$NUM_FLEDGE[idx] = nfledge else breeder.r$NUM_FLEDGE[idx] = breeder.r$NUM_FLEDGE[idx] + nfledge
- 
-		}
-	} else {
-		# first recorded attempt for pair in current year
-		# check if parent information exists for pair
-		father.idx <- which(ped$ID == male)
-		mother.idx <- which(ped$ID == female)
-		if (length(father.idx) == 0 || length(mother.idx) == 0) next
-		ff <- ped$SIRE_ID[father.idx]
-		fm <- ped$DAM_ID[father.idx]
-		mf <- ped$SIRE_ID[mother.idx]
-		mm <- ped$DAM_ID[mother.idx]
-		r = NA
-		if (is.na(ff) || is.na(fm) || is.na(mf) || is.na(mm)) {
-			# parental information for breeding pair is missing, so will use genetic relatedness
-			idx.f = which(rownames(rmat.gen) == male)
-			idx.m = which(colnames(rmat.gen) == female)
-			if (length(idx.f) > 0 && length(idx.m) > 0) r = rmat.gen[idx.f,idx.m]
-		} else {
-			idx.f = which(rownames(rmat.ped) == male)
-			idx.m = which(rownames(rmat.ped) == female)
-			if (length(idx.f) > 0 && length(idx.m) > 0) r = rmat.ped[idx.f,idx.m]		
-		}
-		# record pair
-		breeder.r <- rbind(breeder.r, data.frame(YEAR=year, MALE=male, FEMALE=female, RELATEDNESS=r, NUM_FLEDGE=nfledge))
-	}
-}
-
-# subset of breeders that fledge offspring
-breeder.r.fledge <- breeder.r[which(!is.na(breeder.r$NUM_FLEDGE) & breeder.r$NUM_FLEDGE > 0),]
-
-# data.frame of relatedness stats by year
-breeder.stats <- NULL
-for (t in sort(unique(breeder.r$YEAR))) {
-	breeder.sub <- breeder.r[which(breeder.r$YEAR == t),]
-	all_breeders = nrow(breeder.sub)
-	avg_r_all = mean(breeder.sub$RELATEDNESS,na.rm=TRUE)
-	var_r_all = var(breeder.sub$RELATEDNESS,na.rm=TRUE)
-	breeders.sub.fledge <- breeder.sub[which(!is.na(breeder.sub$NUM_FLEDGE) & breeder.sub$NUM_FLEDGE > 0),]
-	n_fledgers = nrow(breeders.sub.fledge)
-	avg_r_fledge = mean(breeders.sub.fledge$RELATEDNESS, na.rm=TRUE)
-	var_r_fledge = var(breeders.sub.fledge$RELATEDNESS, na.rm=TRUE)
-	breeder.stats <- rbind(breeder.stats, data.frame(YEAR=t, N_PAIRS=all_breeders, AVG_R_ALL = avg_r_all, VAR_R_ALL = var_r_all, N_FLEDGING_PAIRS=n_fledgers, AVG_R_FLEDGE = avg_r_fledge, VAR_R_FLEDGE = var_r_fledge))
-}
-
-# plot
-
-time.periods=sort(unique(breeder.r.fledge$YEAR))
-
-nf <- NULL # number of fledging pairs in each time period
-for (t in time.periods) {
-	n = length(which(breeder.r$YEAR == t & !is.na(breeder.r$RELATEDNESS) & !is.na(breeder.r$NUM_FLEDGE) & breeder.r$NUM_FLEDGE > 0))
-	nf <- c(nf,n)
-}
-
-set.seed(5329875)
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/figures/temporal_fledging_pair_relatedness.png', width=17, height=7, units='in', res=300)
-x11(width=17,height=7)
-par(mgp = c(2.75,1,0))
-plot(1, type="n", xlim=c(min(time.periods),max(time.periods)), ylim=c(0,max(breeder.r.fledge$RELATEDNESS,na.rm=TRUE)),xlab="", ylab="Breeding pair relatedness", main="",xaxt='n', cex.axis=1.3, cex.lab=1.5)
-title(xlab="Year and number of pairs that fledged offspring", line=3.5, cex.lab=1.5)
-axis(side=1,at=time.periods,labels=paste(time.periods,"\nn = ",nf,sep=""),cex=1.5,cex.axis=1.3, padj=0.5)
-abline(v=time.periods, col="gray85", lty=2)
-abline(h=seq(from=0,to=signif(max(breeder.r.fledge$RELATEDNESS,na.rm=TRUE),1),by=0.1), col="gray90", lty=2)
-points(x=jitter(breeder.r.fledge$YEAR,0.5),y=breeder.r.fledge$RELATEDNESS, pch=21, bg=alpha("grey20",0.4), col="black", lwd=1.1, cex=1.7)
-
-# add trend line
-linear.fit <- lm(breeder.r.fledge$RELATEDNESS~breeder.r.fledge$YEAR)
-abline(linear.fit, lwd=1.3,col=alpha("black",0.8))
-text(x=2007,y=0.12,labels=bquote(beta == .(signif(linear.fit$coefficients[2],1))),cex=1.3)
-
-#dev.off()
-
---- end R code for relatedness between breeding pairs ---
+--- end R code for demographic expansion ----
