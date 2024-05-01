@@ -1625,11 +1625,11 @@ Reported thetas estimated using all contemporary CR and all resident CR individu
 The following describes calculating individual inbreeding coefficients, F, with ngsF based on allele frequencies 
 for the population specific to sets of individuals.
 
-# Calculate genotype likelihoods for populations
+# Calculate genotype likelihoods for populations (includes all individuals for each population)
 
 Genotype likelihoods for the Contemporary CR population
 
-$sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/contemporary_binary_gl.sh
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/contemporary_binary_gl.sh
 implements:
 
 --- start bash code ---
@@ -1643,7 +1643,8 @@ angsd -bam $BAMLIST -out $OUTPREFIX -GL 1 -doGlf 3 -doMaf 1 -doMajorMinor 1 -SNP
 
 --- end bash code ---
 
-Genotype likelihoods for the resident CR population
+
+Genotype likelihoods for the Resident CR population
 
 $ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/resident_binary_gl.sh
 implements:
@@ -1658,6 +1659,7 @@ OUTPREFIX='/mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/resident_cr_b
 angsd -bam $BAMLIST -out $OUTPREFIX -GL 1 -doGlf 3 -doMaf 1 -doMajorMinor 1 -SNP_pval 1e-4 -minQ 20 -minMapQ 20 -remove_bads 1 -only_proper_pairs 1 -uniqueOnly 1 -rf $REGFILE -sites $SITESFILE -P 16
 
 --- end bash code ---
+
 
 Genotype likelihoods for the donor population individuals
 
@@ -1675,13 +1677,13 @@ angsd -bam $BAMLIST -out $OUTPREFIX -GL 1 -doGlf 3 -doMaf 1 -doMajorMinor 1 -SNP
 
 --- end bash code ---
 
+
 Genotype likelihoods for all historic (jays sampled from 2003-2008) M4 metapopulation individuals
 
 $ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/historic_metapop_binary_gl.sh
 implements:
 
 --- start bash code ---
-
 BAMLIST='/mnt/research/Fitz_Lab/projects/mosaic/map/population_specific_bam_lists/historic_metapopulation_bams.txt'
 REGFILE='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ_V3_main_autosomes.txt'
 SITESFILE='/mnt/research/Fitz_Lab/projects/mosaic/variants/vcf/biallelic_snps/fsj_mosaic_biallelic_snps_main_autosomes_qc.pos'
@@ -1690,6 +1692,7 @@ OUTPREFIX='/mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/historic_meta
 angsd -bam $BAMLIST -out $OUTPREFIX -GL 1 -doGlf 3 -doMaf 1 -doMajorMinor 1 -SNP_pval 1e-4 -minQ 20 -minMapQ 20 -remove_bads 1 -only_proper_pairs 1 -uniqueOnly 1 -rf $REGFILE -sites $SITESFILE -P 16
 
 --- end bash code ---
+
  
 Genotype likelihoods for Site 13
 
@@ -1707,7 +1710,8 @@ angsd -bam $BAMLIST -out $OUTPREFIX -GL 1 -doGlf 3 -doMaf 1 -doMajorMinor 1 -SNP
 
 --- end bash code ---
 
-# Calculate inbreeding coefficients with ngsF
+
+# Calculate inbreeding coefficients with ngsF. This provides initital F estimates for all individuals.
 
 Calculate inbreeding coefficient for Contemporary CR individuals using Contemporary CR allele frequencies
 
@@ -1727,6 +1731,7 @@ eval $CMD
 
 --- end bash code ---
 
+
 Calculate inbreeding coefficient for Resident CR individuals using Resident CR allele frequencies
 
 $ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/resident_inbreed_coef.sh
@@ -1744,6 +1749,7 @@ printf "\n%s\n\n" "$CMD"
 eval $CMD
 
 --- end bash code ---
+
 
 Calculate inbreeding coefficient for Site 13 individuals using Site 13 allele frequencies
 
@@ -1763,6 +1769,7 @@ eval $CMD
 
 --- end bash code ---
 
+
 Calculate inbreeding coefficient for donor site individuals using pooled donor site allele frequencies
 
 $ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/donor_pops_inbreed_coef.sh
@@ -1780,6 +1787,7 @@ printf "\n%s\n\n" "$CMD"
 eval $CMD
 
 --- end bash code ---
+
 
 Calculate inbreeding coefficient for historic metapopulation individuals using historic metapopulation allele frequencies
 
@@ -1799,9 +1807,123 @@ eval $CMD
 
 --- end bash code ---
 
-Attach individual identity to the output of ngsF and collate results that use population specific allele frequencies. Note that 
-{site1, site12, site18, Texaco} used allele frequencies from the pool of all donor sites and all 'other' M4 individuals used 
-allele frequencies of the historic metapopulation (all jays sampled from 2003-2008).
+
+# Estimate GLs for subsets from each population where all pairwise relatedness is <= 0.4.
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/binary_gl_maxr0.4_subset_array.sh
+implements:
+
+--- start bash code ---
+
+GRP_ARR=('contemporary_cr' 'resident_cr' 'donor_pops' 'historic_metapop' 'site13')
+FSJGRP="${GRP_ARR[$SLURM_ARRAY_TASK_ID]}"
+BAMLIST="/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs/${FSJGRP}_relatedness_maxr0.4_bams.txt"
+OUTPREFIX="/mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/${FSJGRP}_maxr0.4_subset_biallelic_snps_main_autosomes_qc_glf3"
+REGFILE='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ_V3_main_autosomes.txt'
+SITESFILE='/mnt/research/Fitz_Lab/projects/mosaic/variants/vcf/biallelic_snps/fsj_mosaic_biallelic_snps_main_autosomes_qc.pos'
+
+CMD="angsd -bam $BAMLIST -out $OUTPREFIX -GL 1 -doGlf 3 -doMaf 1 -doMajorMinor 1 -SNP_pval 1e-4 -minQ 20 -minMapQ 20 -remove_bads 1 -only_proper_pairs 1 -uniqueOnly 1 -rf $REGFILE -sites $SITESFILE -P 16"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
+
+--- end bash code ---
+
+
+# Estimate F and MAF for subsets of individuals that exclude first-degree relatives (all r <= 0.4). This provides more accurate MAF estimates that account for inbreeding.
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/maxr_0.4_groups_ngsf_calc_array.sh
+implements:
+
+--- start bash code ---
+
+INPUT_LIST='/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/maxr_0.4_groups_ngsf_inputs.txt'
+POP=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$INPUT_LIST" | cut -f1)
+GENOLIKES=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$INPUT_LIST" | cut -f2)
+NIND=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$INPUT_LIST" | cut -f3)
+NSITES=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$INPUT_LIST" | cut -f4)
+OUTFILE="/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/${POP}_maxr0.4_biallelic_snps_main_autosomes_qc_F.txt"
+
+CMD="ngsF --glf $GENOLIKES --init_values e --out $OUTFILE --n_ind $NIND --n_sites $NSITES --max_iters 3000 --n_threads 20"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
+
+--- end bash code ---
+
+
+# Replace the MAF estimates in the ngsF parameter file generated from the analysis involving all individuals from each population group 
+# with MAF estimates from the analysis using only individuals from the respective group/population for which all pairwise r <= 0.4.
+
+workdir='/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats'
+
+$ ./scripts/replaceMaf 16,14 1168799 resident_cr_biallelic_snps_main_autosomes_qc_F.txt.pars resident_cr_maxr0.4_biallelic_snps_main_autosomes_qc_F.txt.pars resident_cr_biallelic_snps_main_autosomes_qc_F_modified_maf.par
+
+$ ./scripts/replaceMaf 28,28 1347940 contemporary_cr_biallelic_snps_main_autosomes_qc_F.txt.pars contemporary_cr_maxr0.4_biallelic_snps_main_autosomes_qc_F.txt.pars contemporary_cr_biallelic_snps_main_autosomes_qc_F_modified_maf.par
+
+$ ./scripts/replaceMaf 30,16 1245900 donor_pops_biallelic_snps_main_autosomes_qc_F.txt.pars donor_pops_maxr0.4_biallelic_snps_main_autosomes_qc_F.txt.pars donor_pops_biallelic_snps_main_autosomes_qc_F_modified_maf.par
+
+$ ./scripts/replaceMaf 59,39 1787861 historic_metapop_biallelic_snps_main_autosomes_qc_F.txt.pars historic_metapop_maxr0.4_biallelic_snps_main_autosomes_qc_F.txt.pars historic_metapop_biallelic_snps_main_autosomes_qc_F_modified_maf.par
+
+$ ./scripts/replaceMaf 19,10 855080 site13_biallelic_snps_main_autosomes_qc_F.txt.pars site13_maxr0.4_biallelic_snps_main_autosomes_qc_F.txt.pars site13_biallelic_snps_main_autosomes_qc_F_modified_maf.par
+
+# Calculate genotype likelihoods for all individuals in a group/population at sites segregating 
+# in the subsets with max r <= 0.4.
+
+The major and minor allele for the GL calculations was set according to the major/minor designations in the 
+subsets of individuals with relatedness <= 0.4.
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/binary_gl_set_sites_array.sh
+implements:
+
+--- start bash code ---
+
+INPUT_LIST='/mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/binary_gl_set_sites_input.txt'
+POP=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$INPUT_LIST" | cut -f1)
+BAMLIST=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$INPUT_LIST" | cut -f2)
+SITESFILE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$INPUT_LIST" | cut -f3)
+REGFILE='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ_V3_main_autosomes.txt'
+OUTPREFIX="/mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/${POP}_allind_maxr0.4_qc_biallelic_snp_subset_glf3"
+
+CMD="angsd -bam $BAMLIST -out $OUTPREFIX -GL 1 -doGlf 3 -doMajorMinor 3 -minQ 20 -minMapQ 20 -remove_bads 1 -only_proper_pairs 1 -uniqueOnly 1 -rf $REGFILE -sites $SITESFILE -P 16"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
+
+--- end bash code ---
+
+
+# Estimate F for all individuals with fixed MAF.
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/pop_specific_fixed_maf_ngsf_calc_array.sh
+implements:
+
+--- begin bash code ---
+
+INPUT_LIST='/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/pop_specific_fixed_maf_ngsf_calc_inputs.txt'
+POP=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$INPUT_LIST" | cut -f1)
+GENOLIKES=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$INPUT_LIST" | cut -f2)
+PARFILE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$INPUT_LIST" | cut -f3)
+NIND=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$INPUT_LIST" | cut -f4)
+NSITES=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$INPUT_LIST" | cut -f5)
+OUTFILE="/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/${POP}_allind_maxr0.4_biallelic_snps_main_autosomes_qc_fixedmaf_F.txt"
+
+CMD="ngsF --glf $GENOLIKES --init_values $PARFILE --freq_fixed --out $OUTFILE --n_ind $NIND --n_sites $NSITES --max_iters 3000 --n_threads 20"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
+
+--- end bash code ---
+
+
+Attach individual identity to the output of ngsF and collate results that use population specific allele frequencies. 
+Note that {site1, site12, site18, Texaco} used allele frequencies from the pool of all donor sites and all 'other' M4 
+individuals used allele frequencies of the historic metapopulation (all jays sampled from 2003-2008). Allele frequencies 
+were estimated after removing first degree relationships.
 
 --- start R code ---
 
@@ -1809,11 +1931,11 @@ allele frequencies of the historic metapopulation (all jays sampled from 2003-20
 meta <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
 
 # read in F values
-contemp_cr <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/contemporary_cr_biallelic_snps_main_autosomes_qc_F.txt', head=FALSE)
-res_cr <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/resident_cr_biallelic_snps_main_autosomes_qc_F.txt', head=FALSE)
-s13 <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/site13_biallelic_snps_main_autosomes_qc_F.txt', head=FALSE)
-donor <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/donor_pops_biallelic_snps_main_autosomes_qc_F.txt', head=FALSE)
-histmeta <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/historic_metapop_biallelic_snps_main_autosomes_qc_F.txt', head=FALSE)
+contemp_cr <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/contemporary_cr_allind_maxr0.4_biallelic_snps_main_autosomes_qc_fixedmaf_F.txt', head=FALSE)
+res_cr <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/resident_cr_allind_maxr0.4_biallelic_snps_main_autosomes_qc_fixedmaf_F.txt', head=FALSE)
+s13 <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/site13_allind_maxr0.4_biallelic_snps_main_autosomes_qc_fixedmaf_F.txt', head=FALSE)
+donor <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/donor_pops_allind_maxr0.4_biallelic_snps_main_autosomes_qc_fixedmaf_F.txt', head=FALSE)
+histmeta <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/historic_metapop_allind_maxr0.4_biallelic_snps_main_autosomes_qc_fixedmaf_F.txt', head=FALSE)
 
 # read in lists of bam files used to calculate genotype likelihood input for ngsF
 contemp_bam <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/map/population_specific_bam_lists/contemporary_cr_bams.txt', head=FALSE)
@@ -1851,25 +1973,26 @@ for (i in 1:nrow(combF)) {
 	} else if (pop == "SITE_1" || pop == "SITE_12" || pop == "SITE_18" || pop == "TEXACO") {
 		combF$F_POP_SPECIFIC_AF[i] <- combF$F_DONOR_AF[i]
 	} else if (pop == "Golden_Aster_Scrub" || pop == "Brigman" || pop == "W.Balm" || pop == "Duette_headwaters" || pop == "Sun_City") {
-		combF$F_POP_SPECIFIC_AF[i] <- combF$F_HISTORIC_METAPOP_AF[i]
+ 		combF$F_POP_SPECIFIC_AF[i] <- combF$F_HISTORIC_METAPOP_AF[i]
 	} else {
 		stop(paste0("Unknown population ",pop))
 	}
 }
 
 # write results
-# write.table(combF, file='/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_pop_specific_ref_AF.txt', col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE)
+# write.table(combF, file='/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_pop_specific_ref_AF_fixedMAF.txt', col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE)
 
 --- end R code ---
+
 
 ## Statistical tests comparing F between groups
 
 --- start R code ---
 
 # read in F values calculated using population-specific allele frequencies
-f.popaf <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_pop_specific_ref_AF.txt', head=TRUE)
+f.popaf <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_pop_specific_ref_AF_fixedMAF.txt', head=TRUE)
 
-# read in IDs for subsets of individuals for which all pairwise relatedness is <= 0.4 (subsets exclude first degree relatives)
+# read in IDs for subsets of individuals
 contemp.all <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs/contemporary_cr_ids.txt',head=FALSE)$V1 # pairwise relatedness between all of these samples is < 0.4, so is an "unrelated" sample for this analysis
 res.all <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs/resident_cr_ids.txt',head=FALSE)$V1
 res.unrelate <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs/resident_cr_relatedness_maxr0.4_ids.txt',head=FALSE)$V1
@@ -1885,65 +2008,65 @@ shapiro.test(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE
 #	Shapiro-Wilk normality test
 #
 #data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)]
-#W = 0.52384, p-value = 2.028e-08
+#W = 0.43, p-value = 2.332e-09
 
 shapiro.test(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)])
 #
 #	Shapiro-Wilk normality test
 #
 #data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)]
-#W = 0.45359, p-value = 2.618e-06
+#W = 0.40247, p-value = 1.116e-06
 
 shapiro.test(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)])
 #
 #	Shapiro-Wilk normality test
 #
 #data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)]
-#W = 0.68529, p-value = 0.0001738
+#W = 0.48591, p-value = 2.713e-06
 
 ## F summary stats for different groups
 
 # All Contemporary CR individuals (all pairwise r < 0.4, i.e. no first degree relatives)
 mean(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)])
-#[1] 0.01707861 
+#[1] 0.01538686
 sd(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)])
-#[1] 0.02587532
+#[1] 0.02530222
 range(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)])
-#[1] 0.001406 0.137558
+#[1] 0.004188 0.136676
 
 # All resident CR individuals
 mean(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.all == TRUE)])
-#[1] 0.01012019
+#[1] 0.009614
 sd(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.all == TRUE)])
-#[1] 0.02268801
+#[1] 0.02067239
 range(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.all == TRUE)])
-#[1] 0.000277 0.091737
+#[1] 0.001088 0.084474
 
-# Resident CR individuals without first degree relatives (r <= 0.4)
+# Unrelated (r <= 0.4) resident CR individuals
 mean(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)])
-#[1] 0.01033443
-#sd(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)])
-[1] 0.02424458
+#[1] 0.0092825
+sd(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)])
+#[1] 0.02206545
 range(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)])
-#[1] 0.000277 0.091737
+#[1] 0.001088 0.084474
 
-# All translocated individuals
+# all translocated individuals
 mean(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.all == TRUE)])
-#[1] 0.004767345
+#[1] 0.004774034
 sd(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.all == TRUE)])
-#[1] 0.009077819
-#range(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.all == TRUE)])
-[1] 0.000092 0.042977
+#[1] 0.007003384
+range(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.all == TRUE)])
+#[1] 0.000604 0.039239
 
-# Translocated individuals without first degree relatives (r <= 0.4)
+# Unrelated (r <= 0.4) translocated individuals
 mean(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)])
-#[1] 0.008187267
+#[1] 0.005556267
 sd(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)])
-#[1] 0.01176101
+#[1] 0.009559863
 range(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)])
-#[1] 0.000183 0.042977
+#[1] 0.000604 0.039239
 
-## Test for differences in F distribution
+## Test for differences in F distributions
 
 # Contemporary vs Resident CR after removing relatedness > 0.4
 wilcox.test(x=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)], y=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)], alternative="two.sided")
@@ -1951,16 +2074,16 @@ wilcox.test(x=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRU
 #	Wilcoxon rank sum exact test
 #
 #data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)] and f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)]
-#W = 308, p-value = 0.002208
+#W = 341, p-value = 3.872e-05
 #alternative hypothesis: true location shift is not equal to 0
 
-# Contemporary versus translocated after removing relatedness > 0.4
+# Contemporary versus translocated individuals after removing relatedness > 0.4
 wilcox.test(x=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)], y=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)], alternative="two.sided")
 #
 #	Wilcoxon rank sum exact test
 #
 #data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)] and f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)]
-#W = 298, p-value = 0.02453
+#W = 356, p-value = 9.135e-05
 #alternative hypothesis: true location shift is not equal to 0
 
 # Resident CR versus translocated individuals after removing relatedness > 0.4
@@ -1969,26 +2092,25 @@ wilcox.test(x=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TR
 #	Wilcoxon rank sum exact test
 #
 #data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)] and f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)]
-#W = 89, p-value = 0.5045
+#W = 96, p-value = 0.7148
 #alternative hypothesis: true location shift is not equal to 0
-
 
 --- end R code ---
 
 
-## boxplots comparing individual inbreeding estimated with ngsF using population-specific allele frequencies - Figure 3B
+## boxplots comparing individual inbreeding estimated using population-specific allele frequencies
 
 --- start R code ---
 
 library(scales)
 
 meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
-fdf <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_pop_specific_ref_AF.txt', head=TRUE)
+fdf <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_pop_specific_ref_AF_fixedMAF.txt', head=TRUE)
 fdf <- fdf[match(meta$LAB_ID, fdf$ID),] # ensure that the order of individuals matches the metadata
 
-meta$popletter <- popletters(meta) # popletters function defined in /home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/README_MOSAIC_ANALYSIS
-meta$popcol <- popcolor(meta) # popcolor function defined in /home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/README_MOSAIC_ANALYSIS
-meta$colors <- sitecol(meta) # sitecol function defined in /home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/README_MOSAIC_ANALYSIS
+meta$popletter <- popletters(meta)
+meta$popcol <- popcolor(meta)
+meta$colors <- sitecol(meta)
 
 # define groups
 groups <- meta$pop
@@ -2007,20 +2129,27 @@ fdf <- fdf[-which(fdf$ID == "T_072"),]
 meta <- meta[-which(meta$LAB_ID == "T_072"),]
 
 # set point type
-fdf$biopoint = biopoint(meta$pop) # biopoint function defined in /home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/README_MOSAIC_ANALYSIS
+fdf$biopoint = biopoint(meta$pop)
 
 max(fdf$F_POP_SPECIFIC_AF)
-# [1] 0.137558 # set upper y-limit above this value
+# [1] 0.136676 # set upper y-limit above this value
 
 # plot
 
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/F_distribution_pop_specific_AF.png',width=7, height=7,units='in', res=300)
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/F_distribution_pop_specific_AF_fixedMAF.png',width=7, height=7,units='in', res=300)
 h_boxplot2(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=fdf$biopoint, seed=1947, color=meta$popcol, ylim=c(0,0.145))
 axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
 #dev.off()
 
+# Cut off y-limit at F = 5% to for better resolution of lower F values
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/F_distribution_pop_specific_AF_fixedMAF_ylim_cut.png',width=7, height=7,units='in', res=300)
+h_boxplot2(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=fdf$biopoint, seed=1947, color=meta$popcol, ylim=c(0,0.05))
+axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
+#dev.off()
+
+
 # make plot with IDs at points
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/figures/F_distribution_pop_specific_AF_text.pdf',width=7, height=7)
+#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/figures/F_distribution_pop_specific_AF_fixedMAF_text.pdf',width=7, height=7)
 h_boxplot2(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.145), idlabels=fdf$ID)
 axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
 
@@ -2033,12 +2162,16 @@ h_boxplot2(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(i
 axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
 
 # zoom even more
+h_boxplot2(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.007), idlabels=fdf$ID)
+axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
+
+# highest resolution zoom
 h_boxplot2(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.003), idlabels=fdf$ID)
 axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
 
 #dev.off()
 
-## make a plot to find where the top 5 pedigree-based contributors circled in figure 3A are in the boxplot
+# make a plot to find where the top five pedigree-based contributors circled in figure 3A are in the boxplot
 
 h_boxplot_mask <- function(x=NULL, n=NULL, lev=grplevels, ylabel="Heterozygosity", pntlab=NULL, seed=10287, color=NULL, ylimits=NULL, idlabels=NULL) {
         if (length(grep("TeachingDemos",(.packages()))) == 0) library(TeachingDemos) # for shadowtext()
@@ -2083,10 +2216,11 @@ meta$maskcol[which(meta$LAB_ID == "T_081")] <- alpha(meta$popcol[which(meta$LAB_
 meta$maskcol[which(meta$LAB_ID == "T_086")] <- alpha(meta$popcol[which(meta$LAB_ID == "T_086")],0.65)
 meta$maskcol[which(meta$LAB_ID == "T_067")] <- alpha(meta$popcol[which(meta$LAB_ID == "T_067")],0.65)
 
+#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/figures/F_distribution_pop_specific_AF_fixedMAF_top5ped_contributors_highlight.pdf',width=7, height=7)
 h_boxplot_mask(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=fdf$biopoint, seed=1947, color=meta$maskcol, ylim=c(0,0.145))
+#dev.off()
 
 --- end R code ---
-
 
 #
 #
@@ -2674,9 +2808,9 @@ frohdf <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/estimat
 
 frohdf <- frohdf[match(meta$LAB_ID, frohdf$ID),] # ensure that the order of individuals matches the metadata
 
-meta$popletter <- popletters(meta) # popletters function defined in /home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/README_MOSAIC_ANALYSIS
-meta$popcol <- popcolor(meta) # popcolor function defined in /home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/README_MOSAIC_ANALYSIS
-meta$colors <- sitecol(meta) # sitecol function defined in /home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/README_MOSAIC_ANALYSIS
+meta$popletter <- popletters(meta)
+meta$popcol <- popcolor(meta)
+meta$colors <- sitecol(meta)
 
 # define groups
 groups <- meta$pop
@@ -2695,7 +2829,7 @@ frohdf <- frohdf[-which(frohdf$ID == "T_072"),]
 meta <- meta[-which(meta$LAB_ID == "T_072"),]
 
 # set point type
-frohdf$biopoint = biopoint(meta$pop) # biopoint function defined in /home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/README_MOSAIC_ANALYSIS
+frohdf$biopoint = biopoint(meta$pop)
 
 max(frohdf$FROH_BEST)
 #[1] 0.2478308 # max Froh - set y-limit above this
