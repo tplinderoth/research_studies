@@ -591,6 +591,6 @@ if (rmatrix == 1) {
 	ped2 = prepPed(ped.sim[,1:4], gender='SEX', check=TRUE)
 	rmat = as.matrix(makeA(ped2[,1:3])) # as.matrix to convert sparse dsCMatrix into base matrix class
 	outmat = paste0(outprefix,".mat")
-	write.table(rmat, file=outmat, col.names=TRUE, row.names=FASE, quote=FALSE, sep=" ")
-	write(paste0("Output additive relatedness matrix: ",rmat), stderr())
+	write.table(rmat, file=outmat, col.names=TRUE, row.names=FALSE, quote=FALSE, sep=" ")
+	write(paste0("Output additive relatedness matrix: ",outmat), stderr())
 }
