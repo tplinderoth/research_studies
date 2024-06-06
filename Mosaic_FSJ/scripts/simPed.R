@@ -594,3 +594,6 @@ if (rmatrix == 1) {
 	write.table(rmat, file=outmat, col.names=TRUE, row.names=FALSE, quote=FALSE, sep=" ")
 	write(paste0("Output additive relatedness matrix: ",outmat), stderr())
 }
+
+# return exit status of 0 upon successful completion
+quit(save = "no", status = 0, runLast = FALSE)
