@@ -120,7 +120,7 @@ if (!is.null(arg[[11]])) outprefix = arg[[11]][1] else outprefix = paste0(arg[[1
 write(paste0("\nSIMPED INPUTS\n--------------\nped file: ", arg[[1]][1], "\nindividual metadata file: ", arg[[2]][1], "\nnest metadata file: ", arg[[3]][1], 
 "\nre-pair rate: ", rp, "\nancestral IDs file: ", ancfile, "\nmaximum offspring per pair each generation: ", maxoffspring, 
 "\nAge of sexual maturity: ", mature, "\nProportion males: ", p_male, "\nRelatedness matrix: ", rmatrix, "\nseed: ", seed), stderr())
-if (keep_unbanded == 1) write("Discarding unbanded individuals\n", stderr()) else write("Keeping unbanded individuals\n", stderr())
+if (keep_unbanded == 1) write("Keeping unbanded individuals\n", stderr()) else write("Excluding unbanded individuals\n", stderr())
 
 ## set metadata info
 
