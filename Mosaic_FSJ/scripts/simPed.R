@@ -581,6 +581,7 @@ write(paste0("Output simulated pedigree: ",outped), stderr())
 if (!is.null(anc)) {
 	id_map_focal = data.frame(SIM_ID = ped.sim$ID[which(ped.sim$FOCAL_ANC == 1)])
 	id_map_focal$PED_ID = sapply(id_map_focal$SIM_ID, function(x,df){df[which(df[,2] == x),1]}, df=id_map, USE.NAMES=FALSE)
+	id_map_focal$POPULATION = sapply(id_map_focal$SIM_ID, function(x,df){df$POPULATION[which(df$ID == x)]}, df=ped.sim, USE.NAMES=FALSE)
 	out_idmap = paste0(outprefix, ".id")
 	write.table(id_map_focal, file=out_idmap, col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE)
 	write(paste0("Output ancestral individual ID map: ", out_idmap), stderr())
