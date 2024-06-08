@@ -173,7 +173,7 @@ my @outfh;
 foreach my $i (0 .. $#years) {
 	my $outname = "${outprefix}_${years[$i]}.tsv";
 	open($outfh[$i], '>>', "$outname") or die("Unable to open output filehandle $outname\n");
-	print { $outfh[$i] } "SEED\tMAX_CONTRIBUTION\tN_RESIDENT_CONTRIBUTORS\t@fid\n"; # header
+	print { $outfh[$i] } "SEED\tMAX_CONTRIBUTION\tN_RESIDENT_CONTRIBUTORS\tN_TRANSLOCATED_CONTRIBUTORS\t@fid\n"; # header
 }
 
 ## simulate pedigrees and calculate stats
