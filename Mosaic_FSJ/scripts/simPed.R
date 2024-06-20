@@ -11,43 +11,49 @@ mature <- 1 # minimum age in years at which indivdiuals can produce offspring
 p_male <- 0.5 # probility that an offspring is male for assigning sex to individuals with unknown sex
 keep_unbanded = 0 # whether to keep unbanded individuals in analyses
 rmatrix = 0 # type of relatedness matrix to calculate (0 = none, 1 = additive)
+calc_f = 0 # 1 = calculate inbreeding coefficient from pedigree
 outprefix = NULL
 
 ## parse inputs
 parseArgs <- function(argv = NULL) {
-	arg <- vector(mode = "list", length=12) # [ped TSV, individual metadata TSV, nest metadata TSV, re-pair rate, ancestral ID file, max number offspring, sexual maturity, keep unbanded, seed]
+	arg <- vector(mode = "list", length=13) # [ped TSV, individual metadata TSV, nest metadata TSV, ...]
 	arg[[1]] <- argv[length(argv)-2]
 	arg[[2]] <- argv[length(argv)-1]
 	arg[[3]] <- argv[length(argv)]
 	argv  <- argv[-c(length(argv), length(argv)-1, length(argv)-2)]
 	i = 1
-	while (i < length(argv)) {
+	while (i <= length(argv)) {
 		if (argv[i] == "--rp") {
-			arg[[4]] <- as.numeric(argv[i+1])
+			if (length(argv) >= i+1) arg[[4]] <- as.numeric(argv[i+1]) else break
 		} else if (argv[i] == "--anc") {
-			arg[[5]] <- argv[i+1]
+			if (length(argv) >= i+1) arg[[5]] <- argv[i+1] else break
 		} else if (argv[i] == "--maxoffspring") {
-			arg[[6]] <- as.integer(argv[i+1])
+			if (length(argv) >= i+1) arg[[6]] <- as.integer(argv[i+1]) else break
 		} else if (argv[i] == "--mature") {
-			arg[[7]] <- as.integer(argv[i+1])
+			if (length(argv) >= i+1) arg[[7]] <- as.integer(argv[i+1]) else break
 		} else if (argv[i] == "--keep_unbanded") {
 			arg[[8]] <- 1
 			i = i+1
 			next
 		} else if (argv[i] == "--p_male") {
-			arg[[9]] <- as.numeric(argv[i+1])
+			if (length(argv) >= i+1) arg[[9]] <- as.numeric(argv[i+1]) else break
 		} else if (argv[i] == "--rmatrix") {
-			arg[[10]] <- as.integer(argv[i+1])
+			if (length(argv) >= i+1) arg[[10]] <- as.integer(argv[i+1]) else break
 		} else if (argv[i] == "--out") {
-			arg[[11]] <- argv[i+1]
+			if (length(argv) >= i+1) arg[[11]] <- argv[i+1] else break
+		} else if (argv[i] == "--calc_f") {
+			arg[[12]] <- 1
+			i = i+1
+			next
 		} else if (argv[i] == "--seed") {
-			arg[[12]] <- as.integer(argv[i+1])
+			if (length(argv) >= i+1) arg[[13]] <- as.integer(argv[i+1]) else break
 		} else {
 			arg <- paste0("Unknown argument ", argv[i], "\n")
 			break
 		}
 		i = i+2
 	}
+	if (i <= length(argv)) arg = NULL
 	return(arg)
 }
 
@@ -66,6 +72,7 @@ if (length(args) < 3) {
 	cat(paste0("--p_male <FLOAT>   Proportion of individuals of unknown sex that are male. [", p_male, "]\n"))
 	cat(paste0("--rmatrix <INT>   Calculate relatedness matrix, 0 = none, 1 = additive. [", rmatrix, "]\n"))
 	cat("--out <STRING>   Output file name (prefix). If not specified, output files have '_seed.extension' appended to ped input file name.\n")
+	cat("--calc_f   Calculate pedigree inbreeding. Input ped can have a column, labeled 'F', of inbreeding coefficients for base population individuals (values for other individuals are ignored).\n")
 	cat("--seed <INT>   Sets the random seed. [random]\n")
 	cat("\n")
 	options(show.error.messages=FALSE)
@@ -73,6 +80,7 @@ if (length(args) < 3) {
 }
 
 arg <- parseArgs(args)
+if (is.null(arg)) stop(paste0("ERROR. Malformed input \n", args))
 
 for (i in 1:3) {
 	if (file.exists(arg[[i]][1]) == FALSE) stop(paste0("Unable to find file: ", arg[[i]][1]))
@@ -111,16 +119,25 @@ if (rmatrix == 1) {
 	if (!require("nadiv")) stop(paste0("ERROR. --rmatrix ", rmatrix, " requires 'nadiv' package\n"))
 }
 
+if (!is.null(arg[[12]])) {
+	calc_f = arg[[12]][1]
+	if (!require("ribd")) stop("ERROR. --calc_f requires 'rbid' package\n")
+	if ("F" %in% colnames(ped) == FALSE) {
+		write("Assuming unrelated founders for inbreeding calculations\n", stderr())
+		ped$F = 0
+	}
+}
+
 if (!is.null(arg[length(arg)])) seed = arg[[length(arg)]][1] else seed = round(runif(1,min=1,max=10^9))
 set.seed(seed)
-
 if (!is.null(arg[[11]])) outprefix = arg[[11]][1] else outprefix = paste0(arg[[1]][1],"_",seed)
 
 
 write(paste0("\nSIMPED INPUTS\n--------------\nped file: ", arg[[1]][1], "\nindividual metadata file: ", arg[[2]][1], "\nnest metadata file: ", arg[[3]][1], 
 "\nre-pair rate: ", rp, "\nancestral IDs file: ", ancfile, "\nmaximum offspring per pair each generation: ", maxoffspring, 
-"\nAge of sexual maturity: ", mature, "\nProportion males: ", p_male, "\nRelatedness matrix: ", rmatrix, "\nseed: ", seed), stderr())
-if (keep_unbanded == 1) write("Keeping unbanded individuals\n", stderr()) else write("Excluding unbanded individuals\n", stderr())
+"\nage of sexual maturity: ", mature, "\nproportion males: ", p_male, "\nrelatedness matrix: ", rmatrix, "\nseed: ", seed), stderr())
+if (keep_unbanded == 1) write("Keeping unbanded individuals", stderr()) else write("Excluding unbanded individuals", stderr())
+write(paste0("calculate pedigree inbreeding: ", ifelse(calc_f == 1, "yes", "no"), "\n"), stderr())
 
 ## set metadata info
 
@@ -297,40 +314,42 @@ for (t in tmin:tmax) {
 	# note: pedidx defined suched that RESIDENT_LR individuals are added last, which ensures that their parents will be in the id_map
 	pedidx = c(which(ped$COHORT == t & ped$ORIGIN != "LR" & ped$ORIGIN != "I_LR" & ped$ORIGIN != "RESIDENT_LR"), which(ped$COHORT == t & ped$ORIGIN == "RESIDENT_LR"))
 	addstart = ifelse(is.null(ped.sim), 1, nrow(ped.sim)+1)
-	ped.sim = rbind(ped.sim, ped[pedidx,])
-	for (i in addstart:nrow(ped.sim)) {
-		# assign sim ID to focal individual
-		map_idx = which(id_map[,1] == ped.sim$ID[i])
-		if (length(map_idx) > 0) {
-			ped.sim$ID[i] = id_map[map_idx,2]
-		} else {
-			id_map[map_c,] = c(ped.sim$ID[i], id)
-			map_c = map_c+1
-			ped.sim$ID[i] = id
-			id = id+1
-		}
-
-		# Set parent info of new individual. Keeping missing parent info as '*'.
-		if (ped.sim$SIRE_ID[i] != '*') {
-			map_idx = which(id_map[,1] == ped.sim$SIRE_ID[i])
+	if (length(pedidx) > 0) {
+		ped.sim = rbind(ped.sim, ped[pedidx,])
+		for (i in addstart:nrow(ped.sim)) {
+			# assign sim ID to focal individual
+			map_idx = which(id_map[,1] == ped.sim$ID[i])
 			if (length(map_idx) > 0) {
-				ped.sim$SIRE_ID[i] = id_map[map_idx,2]
+				ped.sim$ID[i] = id_map[map_idx,2]
 			} else {
-				id_map[map_c,] = c(ped.sim$SIRE_ID[i], id)
+				id_map[map_c,] = c(ped.sim$ID[i], id)
 				map_c = map_c+1
-				ped.sim$SIRE_ID[i] = id
+				ped.sim$ID[i] = id
 				id = id+1
 			}
-		}
-		if (ped.sim$DAM_ID[i] != '*') {
-			map_idx = which(id_map[,1] == ped.sim$DAM_ID[i])
-			if (length(map_idx) > 0) {
-				ped.sim$DAM_ID[i] = id_map[map_idx,2]
-			} else {
-				id_map[map_c,] = c(ped.sim$DAM_ID[i], id)
-				map_c = map_c+1
-				ped.sim$DAM_ID[i] = id
-				id = id+1
+
+			# Set parent info of new individual. Keeping missing parent info as '*'.
+			if (ped.sim$SIRE_ID[i] != '*') {
+				map_idx = which(id_map[,1] == ped.sim$SIRE_ID[i])
+				if (length(map_idx) > 0) {
+					ped.sim$SIRE_ID[i] = id_map[map_idx,2]
+				} else {
+					id_map[map_c,] = c(ped.sim$SIRE_ID[i], id)
+					map_c = map_c+1
+					ped.sim$SIRE_ID[i] = id
+					id = id+1
+				}
+			}
+			if (ped.sim$DAM_ID[i] != '*') {
+				map_idx = which(id_map[,1] == ped.sim$DAM_ID[i])
+				if (length(map_idx) > 0) {
+					ped.sim$DAM_ID[i] = id_map[map_idx,2]
+				} else {
+					id_map[map_c,] = c(ped.sim$DAM_ID[i], id)
+					map_c = map_c+1
+					ped.sim$DAM_ID[i] = id
+					id = id+1
+				}
 			}
 		}
 	}
@@ -503,9 +522,9 @@ for (t in tmin:tmax) {
 	all_lr_idx = c(lr_idx, ilr_idx)
 	offspring_total = length(lr_idx) # number of LR offspring to assign parents to in current generation
 	bpidx = which(!is.na(bp[,1]))
+	bp[bpidx,3] = 0
 	if (length(bpidx) > 0 && offspring_total > 0) {
 		recruit_idx = as.numeric(sample(as.character(all_lr_idx), size=offspring_total, replace=FALSE)) # ensures random assignment of LR and I_LR offsprings to parents
-		bp[bpidx,3] = 0
 		#bpvec = sample(x = as.character(bpidx), size = offspring_total, replace = TRUE) # as.character to prevent 1:x, also consider adding weights according to parent age		
 		nassign = offspring_total - sum(bp[,3], na.rm=TRUE) # number of offspring needing to be assigned a breeding pair
 
@@ -572,10 +591,11 @@ ped.sim$POPULATION[which(ped.sim$ORIGIN == "I_LR")] = "UNKNOWN"
 
 #print(ped.sim); stop("Not actually an error, debug stop point\n") # debug
 
-# write pedigree file
-outped = paste0(outprefix,".ped")
-write.table(ped.sim[,c("ID","SIRE_ID","DAM_ID","SEX","COHORT","COHORT_LAST","POPULATION")], file=outped, col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE)
-write(paste0("Output simulated pedigree: ",outped), stderr())
+# write pedigree file - move this to after F calculation. Keeping commented lines below for debugging.
+#outped = paste0(outprefix,".ped")
+#write.table(ped.sim[,c("ID","SIRE_ID","DAM_ID","SEX","COHORT","COHORT_LAST","POPULATION")], file=outped, col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE)
+#write(paste0("Output simulated pedigree: ",outped), stderr())
+outcol = c("ID","SIRE_ID","DAM_ID","SEX","COHORT","COHORT_LAST","POPULATION")
 
 # make dataframe of focal individual ID map
 if (!is.null(anc)) {
@@ -595,6 +615,42 @@ if (rmatrix == 1) {
 	write.table(rmat, file=outmat, col.names=TRUE, row.names=FALSE, quote=FALSE, sep=" ")
 	write(paste0("Output additive relatedness matrix: ",outmat), stderr())
 }
+
+# calculate inbreeding coefficients
+if (calc_f == 1) {
+	# make pedtools ped object out of pedigree dataframe
+	sex_recode = replace(ped.sim$SEX, which(ped.sim$SEX == "MALE"), 1)
+	sex_recode = replace(sex_recode, which(sex_recode == "FEMALE"), 2)
+	sex_recode = replace(sex_recode, which(sex_recode == "*"), 0) # there shouldn't be missing sex, but just in case
+	sex_recode = as.numeric(sex_recode)
+	pedobj = ped(id=ped.sim$ID, fid=replace(ped.sim$SIRE_ID, which(ped.sim$SIRE_ID == "*"),0), mid=replace(ped.sim$DAM_ID, which(ped.sim$DAM_ID == "*"),0), sex=sex_recode)
+	
+	# assign inbreeding values to base population individuals and calculate offspring inbreeding coefficients
+	f_assigned = NULL
+	pedf = NULL
+	for (i in 1:length(pedobj)) {
+		founder.id = founders(pedobj[[i]])
+		founder.f = sapply(founder.id, function(x,df){df$F[which(df$ID == x)]}, df=ped.sim)
+		mis_f_idx = which(is.na(founder.f))
+		if (length(mis_f_idx) > 0) {
+			founder.f[mis_f_idx] = 0
+			f_assigned = c(f_assigned, names(fouder.f)[mis_f_idx])
+		}
+		founderInbreeding(pedobj[[i]], ids=founder.id, chromType="autosomal") = unname(founder.f[founder.id])
+		pedf = c(pedf, inbreeding(pedobj[[i]]))
+	}
+	if (!is.null(f_assigned)) write(paste0("WARNING. Assigned F = 0 to founders ", paste(f_assigned, collapse=", "),"\n"), stderr())
+
+	# append pedigree inbreeding values to trimmed pedigree dataframe
+	ped.sim$PEDIGREE_F = unname(pedf[ped.sim$ID])
+	outcol = c(outcol, "PEDIGREE_F")
+}
+
+# write pedigree file
+colidx = sapply(outcol,function(x,namevec){which(namevec == x)}, namevec=colnames(ped.sim), USE.NAMES=FALSE)
+outped = paste0(outprefix,".ped")
+write.table(ped.sim[,colidx], file=outped, col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE)
+write(paste0("Output simulated pedigree: ",outped), stderr())
 
 # return exit status of 0 upon successful completion
 quit(save = "no", status = 0, runLast = FALSE)
