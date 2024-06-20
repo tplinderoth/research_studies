@@ -4249,6 +4249,8 @@ for (j in 4:ncol(cohort.n)) {
 	n.contributors <- rbind(n.contributors, data.frame(YEAR=time.periods[j-1], N_CONTRIBUTORS = anc.n, N_RES = res.n, N_TRANS = trans.n))
 }
 
+#write.table(n.contributors,file='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/number_contributing_lineages_to_cohorts_cr_ped_20230512.tsv',col.names=TRUE,row.names=FALSE,sep="\t",quote=FALSE)
+
 n.contributors # This is the number of ancestral lineages represented among CR cohorts born each year
 #   YEAR N_CONTRIBUTORS N_RES N_TRANS
 #1  2004             15    14       1
