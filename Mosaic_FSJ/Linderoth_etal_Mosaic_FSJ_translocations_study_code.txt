@@ -1690,7 +1690,6 @@ contemp.prune <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/
 
 # define groups to test differences between
 
-# Test for differences in H between groups
 colnames(meta)[which(colnames(meta) == "pop_name_full")] = "POPULATION" # this is just so column names match the released metadata
 meta$group = replace(meta$POPULATION, which(meta$POPULATION == "contemporary_Core_Region"), "contemporary_cr")
 meta$group = replace(meta$group, which(meta$group == "resident_Core_Region"), "resident_cr")
@@ -1806,10 +1805,8 @@ shapiro.test(meta$H[which(meta$LAB_ID %in% trans.prune == TRUE)])
 #data:  meta$H[which(meta$LAB_ID %in% trans.prune == TRUE)]
 #W = 0.93402, p-value = 0.3131
 
+
 # Test for differences in mean H between groups
-
-# all contemporary vs all resident without E_030
-
 
 # contemporary vs r-pruned residents without E_030
 t.test(x=meta$H[which(meta$LAB_ID %in% contemp.prune == TRUE)], y=meta$H[which(meta$LAB_ID %in% res.prune2 == TRUE)], alternative="two.sided")
