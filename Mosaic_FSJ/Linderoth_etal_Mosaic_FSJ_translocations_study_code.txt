@@ -3918,7 +3918,7 @@ text(x=0.065,y=0.05,label=bquote(italic(r)^2 == .(round(summary(fmod)$r.square, 
 #
 
 
-## ---------- RELATIONSHIP BETWEEN DIFFERENT APPROACHES TO ESTIMATING INBREEDING ---------- ##
+## ---------- RELATIONSHIP BETWEEN DIFFERENT APPROACHES FOR ESTIMATING INBREEDING ---------- ##
 
 --- start R code ---
 
