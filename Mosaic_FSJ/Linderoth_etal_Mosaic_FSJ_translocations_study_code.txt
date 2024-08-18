@@ -1198,8 +1198,6 @@ donor.rmat <- rmat[which(colnames(rmat) %in% donor.id == TRUE), which(colnames(r
 
 --- end R code ---
 
---- start R code ---
-
 
 ## Make relatedness-pruned subsets of individuals (all pairwise r is <= 0.4, i.e. no first degree relatives)
 
