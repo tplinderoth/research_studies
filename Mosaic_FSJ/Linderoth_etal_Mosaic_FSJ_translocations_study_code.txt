@@ -4,9 +4,11 @@
 # species".                                                                                 #
 #                                                                                           #
 # Author contact: lindero1@msu.edu                                                          #
+#                                                                                           #
+# Accompanying data are available at https://doi.org/10.5061/dryad.z612jm6j0                #
 #############################################################################################
 
-Bash code ran interactively (for launching jobs, etc.) are prefixed with '$'.
+Bash code ran interactively (for launching jobs, etc.) is prefixed with '$'.
 
 ## ---------- UNIVERSAL R FUNCTIONS ---------- ##
 
@@ -144,38 +146,136 @@ biopoint <- function(x = NULL) {
 	return(as.numeric(ptcode))
 }
 
-h_boxplot2 <- function(x=NULL, n=NULL, lev=grplevels, ylabel="Heterozygosity", pntlab=NULL, seed=10287, color=NULL, ylimits=NULL, idlabels=NULL) {
-	if (length(grep("TeachingDemos",(.packages()))) == 0) library(TeachingDemos) # for shadowtext()
-	nlevel = length(lev)
+bioclass_col <- function(x = NULL) {
+	x = replace(x,which(x == "contemporary_Core_Region"),"hotpink2")
+	x = replace(x,which(x == "resident_Core_Region"),"purple2")
+	x = replace(x,which(x == "Site_1" | x == "Site_12" | x == "Site_13" | x == "Site_18" | x == "Texaco"), "dodgerblue2")
+	x = replace(x,which(x == "Golden_Aster_Scrub" | x == "Brigman" | x == "West_Balm" | x == "Duette_Headwaters" | x == "Sun_City"),"gold2")
+	return(x)
+}
 
-	par(mar=c(5,5,2,2))
-	boxplot(x[,n] ~ group, data=x, outline=FALSE, names=c(rep("",nlevel)), xlab="", ylab=ylabel, main="", col="gray80", cex.axis=1.5, cex.lab=1.5, lwd=2, ylim=ylimits)
-	mtext(c(lev[1:3],paste("Other","M4",sep="\n")), 1,at=1:nlevel, padj=1, cex=1.5)
+h_boxplot3 <- function(x=NULL, n=NULL, lev=grplevels, ylabel="Heterozygosity", pntlab=NULL, seed=10287, color=NULL, ylimits=NULL, idlabels=NULL, labpos=NULL) {
+        if (length(grep("TeachingDemos",(.packages()))) == 0) library(TeachingDemos) # for shadowtext()
+        nlevel = length(lev)
 
-	# add points
-	for (i in lev) {
-		idx = which(as.character(x$group) == i)
-		set.seed(seed)
-		xjitter = jitter(rep(which(lev == i),length(idx)), amount=0.2)
-		ptcol = NULL
-		for (j in 1:length(idx)) {
-			if (is.null(color)) ptcol = alpha("maroon",0.5) else ptcol = alpha(color[idx[j]],0.5)
-			if (is.null(pntlab) || is.na(pntlab[idx[j]])) {
-				if (!is.null(idlabels)) {
-				  text(y=x[idx[j],n], x=xjitter[j],idlabels[idx[j]],cex=0.5,col="red")
-				} else {
-				  points(y=x[idx[j],n], x=xjitter[j], pch=1, cex=1.2)
-				  points(y=x[idx[j],n], x=xjitter[j], pch=16, cex=1.2, col=ptcol)
-				}
-			} else if (class(pntlab) == "numeric") {
-				points(y=x[idx[j],n], x=xjitter[j], pch=pntlab[idx[j]], col="black", bg=alpha(color[idx[j]],0.65),lwd=1.3,cex=1.5)
-			}  else if (class(pntlab) == "character") {
-				shadowtext(y=x[idx[j],n], x=xjitter[j], labels=pntlab[idx[j]], col=color[idx[j]], bg=alpha("black",0.5), r=0.07, cex=1.2)	
-			} else stop("Unknown argument to pntlab")
-		}
-	}
+        par(mar=c(5,5,2,2))
+        boxplot(x[,n] ~ group, data=x, outline=FALSE, names=c(rep("",nlevel)), xlab="", ylab=ylabel, main="", col="gray80", cex.axis=1.5, cex.lab=1.5, lwd=2, ylim=ylimits)
+        #mtext(lev,1,at=1:nlevel, padj=1, cex=1.5)
+	if (is.null(labpos)) labpos=1:nlevel 
+        mtext(c(lev[1:3],paste("Other","M4",sep="\n")), 1,at=labpos, padj=1, cex=1.5)
+        #mtext("Group",1,at=3,padj=2.5, cex=1.5)
+
+        # add points
+        for (i in lev) {
+                idx = which(as.character(x$group) == i)
+                set.seed(seed)
+                xjitter = jitter(rep(which(lev == i),length(idx)), amount=0.2)
+                ptcol = NULL
+                for (j in 1:length(idx)) {
+                        if (is.null(color)) ptcol = alpha("maroon",0.5) else ptcol = alpha(color[idx[j]],0.5)
+                        if (is.null(pntlab) || is.na(pntlab[idx[j]])) {
+                                if (!is.null(idlabels)) {
+                                  text(y=x[idx[j],n], x=xjitter[j],idlabels[idx[j]],cex=0.5,col="red")
+                                } else {
+                                  points(y=x[idx[j],n], x=xjitter[j], pch=1, cex=1.2)
+                                  points(y=x[idx[j],n], x=xjitter[j], pch=16, cex=1.2, col=ptcol)
+                                }
+                        } else if (class(pntlab) == "numeric") {
+                                points(y=x[idx[j],n], x=xjitter[j], pch=pntlab[idx[j]], col="black", bg=alpha(color[idx[j]],0.65),lwd=1.3,cex=1.5)
+                        }  else if (class(pntlab) == "character") {
+                                shadowtext(y=x[idx[j],n], x=xjitter[j], labels=pntlab[idx[j]], col=color[idx[j]], bg=alpha("black",0.5), r=0.07, cex=1.2)       
+                        } else stop("Unknown argument to pntlab")
+                }
+        }
 
 }
+
+h_boxplot_mask <- function(x=NULL, n=NULL, lev=grplevels, ylabel="Heterozygosity", pntlab=NULL, seed=10287, color=NULL, ylimits=NULL, idlabels=NULL) {
+        if (length(grep("TeachingDemos",(.packages()))) == 0) library(TeachingDemos) # for shadowtext()
+        nlevel = length(lev)
+
+        par(mar=c(5,5,2,2))
+        boxplot(x[,n] ~ group, data=x, outline=FALSE, names=c(rep("",nlevel)), xlab="", ylab=ylabel, main="", col="gray80", cex.axis=1.5, cex.lab=1.5, lwd=2, ylim=ylimits)
+        #mtext(lev,1,at=1:nlevel, padj=1, cex=1.5)
+        mtext(c(lev[1:3],paste("Other","M4",sep="\n")), 1,at=1:nlevel, padj=1, cex=1.5)
+        #mtext("Group",1,at=3,padj=2.5, cex=1.5)
+
+        # add points
+        for (i in lev) {
+                idx = which(as.character(x$group) == i)
+                set.seed(seed)
+                xjitter = jitter(rep(which(lev == i),length(idx)), amount=0.2)
+                ptcol = NULL
+                for (j in 1:length(idx)) {
+                        if (is.null(color)) ptcol = alpha("maroon",0.5) else ptcol = color[idx[j]]
+                        if (is.null(pntlab) || is.na(pntlab[idx[j]])) {
+                                if (!is.null(idlabels)) {
+                                  text(y=x[idx[j],n], x=xjitter[j],idlabels[idx[j]],cex=0.5,col="red")
+                                } else {
+                                  points(y=x[idx[j],n], x=xjitter[j], pch=1, cex=1.2)
+                                  points(y=x[idx[j],n], x=xjitter[j], pch=16, cex=1.2, col=ptcol)
+                                }
+                        } else if (class(pntlab) == "numeric") {
+                                points(y=x[idx[j],n], x=xjitter[j], pch=pntlab[idx[j]], col=alpha("grey70",0.5), bg=color[idx[j]],lwd=1.3,cex=1.5)
+                        }  else if (class(pntlab) == "character") {
+                                shadowtext(y=x[idx[j],n], x=xjitter[j], labels=pntlab[idx[j]], col=color[idx[j]], bg=alpha("black",0.5), r=0.07, cex=1.2)       
+                        } else stop("Unknown argument to pntlab")
+                }
+        }
+
+}
+
+getBeta1 <- function(df=NULL, idx) {
+        # df should be a dataframe with column 1 predictor and column 2 response
+        return(unname((lm(df[idx,2] ~ df[idx,1]))$coefficients[2]))
+}
+
+
+#
+#
+#
+
+
+## ---------- RAW READ COUNTS ---------- ##
+
+Calculate basic summary statistics for the amount of sequencing data generated for individuals.
+
+--- start R code ---
+
+dat <- read.table('/home/tyler/Dropbox/research/jay/mosaic/raw_data/report/X202SC21114224-Z01-F003_final_20220407122035/src/tables/qc_summary_for_R.csv',head=TRUE)
+
+dat$clean_reads = dat$Raw_reads*(dat$Effective_percent/100)
+dat$clean_data = dat$clean_reads*150
+
+
+df <- NULL
+for (id in unique(dat$Sample)) {
+        idx = which(dat$Sample == id)
+        df <- rbind(df,data.frame(ID = id, clean_reads = sum(dat$clean_reads[idx]), clean_data = sum(dat$clean_data[idx])))
+}
+
+# clean read stats
+range(df$clean_reads)
+#[1]  77607781 148867965
+
+mean(df$clean_reads)
+#[1] 88722304
+
+median(df$clean_reads)
+#[1] 83997279
+
+# clean data stats
+
+range(df$clean_data)
+#[1] 11641167213 22330194777
+
+mean(df$clean_data)
+#[1] 13308345544
+
+median(df$clean_data)
+#[1] 12599591808
+
+---- end R code ---
 
 
 #
@@ -206,7 +306,7 @@ eval $CMD
 
 --- end bash code ---
 
-## Perfrom quality control of raw reads
+## Perform quality control of raw reads
 
 # Collate each samples reads that were produced across multiple lanes
 
@@ -878,6 +978,100 @@ tabix -p vcf $OUTVCF
 #
 
 
+## ---------- DISTRIBUTION OF SEQUENCING DEPTH BETWEEN GROUPS ---------- ##
+
+Compare the distribution of average individual sequencing depth between groups for which we 
+test for population genetic differences.
+
+--- start R code ---
+
+library(boot)
+
+meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE)
+colnames(meta)[which(colnames(meta) == "pop_name_full")] = "POPULATION" # this is just to make column names consistent with released metadata
+meta$biogroup = replace(meta$POPULATION, which(meta$POPULATION == "Site_1" | meta$POPULATION == "Site_12" | meta$POPULATION == "Site_13" | meta$POPULATION == "Site_18" | meta$POPULATION == "Texaco"),"donor_pop")
+meta$biogroup = replace(meta$biogroup, which(meta$biogroup == "Golden_Aster_Scrub" | meta$biogroup == "Brigman" | meta$biogroup == "West_Balm" | meta$biogroup == "Duette_Headwaters" | meta$biogroup == "Sun_City"),"other_M4")
+meta$biogroup = factor(meta$biogroup, levels=c("contemporary_Core_Region","resident_Core_Region","donor_pop","other_M4"))
+
+# ANOVA of individual sequencing depth among groups
+
+summary(aov(autosome_depth ~ biogroup, data=meta))
+#            Df Sum Sq Mean Sq F value Pr(>F)
+#biogroup     3   3.75   1.250   1.194  0.317
+#Residuals   83  86.92   1.047 
+
+depth_mod <- lm(autosome_depth ~ biogroup, data=meta)
+
+summary(depth_mod)
+#
+#Call:
+#lm(formula = autosome_depth ~ biogroup, data = meta)
+#
+#Residuals:
+#    Min      1Q  Median      3Q     Max 
+#-1.5607 -0.6141 -0.2823  0.3721  4.5496 
+#
+#Coefficients:
+#                             Estimate Std. Error t value Pr(>|t|)    
+#(Intercept)                   7.12271    0.19340  36.830   <2e-16 ***
+#biogroupresident_Core_Region -0.07744    0.32071  -0.241    0.810    
+#biogroupdonor_pop             0.42547    0.26891   1.582    0.117    
+#biogroupother_M4              0.19684    0.34345   0.573    0.568    
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+#
+#Residual standard error: 1.023 on 83 degrees of freedom
+#Multiple R-squared:  0.04136,	Adjusted R-squared:  0.006713 
+#F-statistic: 1.194 on 3 and 83 DF,  p-value: 0.3173
+
+shapiro.test(resid(depth_mod)) # errors are slightly skewed so will bootstrap to test the effect of group on sequencing depth
+#
+#	Shapiro-Wilk normality test
+#
+#data:  resid(depth_mod)
+#W = 0.84261, p-value = 3.503e-08
+
+set.seed(246369)
+group_depth.boot <- boot(data.frame(x=meta$biogroup,y=meta$autosome_depth), getBeta1, R=10000, stype="i", sim="ordinary")
+group_depth.ci <- boot.ci(group_depth.boot, conf=0.95, type=c("perc","bca"))
+
+group_depth.ci
+#BOOTSTRAP CONFIDENCE INTERVAL CALCULATIONS
+#Based on 10000 bootstrap replicates
+#
+#CALL : 
+#boot.ci(boot.out = group_depth.boot, conf = 0.95, type = c("perc", 
+#    "bca"))
+#
+#Intervals : 
+#Level     Percentile            BCa          
+#95%   (-0.5715,  0.4119 )   (-0.5730,  0.4112 )  
+#Calculations and Intervals on Original Scale
+
+# plot distribution of individual average autosomal sequencing depth for different groups (Figure S8)
+seed = 77361
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/methods_evaluation/sequence_depth_vs_group_boxplot.png', width=7, height=7,units='in', res=300)
+par(mar=c(5,5,2,2))
+boxplot(autosome_depth ~ biogroup, data=meta, outline=FALSE, names=c(rep("",length(unique(meta$biogroup)))), xlab="", ylab="Mean autosome sequence depth", main="", col="gray80", cex.axis=1.5, cex.lab=1.5, lwd=2, ylim=c(max(0,min(meta$autosome_depth)-1),max(meta$autosome_depth)+1))
+mtext(c(paste0("Contemporary\nCR"), paste0("Resident\nCR"), paste0("Donor\npopulations"), paste0("Other\nM4")),1,at=1:5, padj=1, cex=1.5)
+#mtext("Group",1,at=2.5,padj=4, cex=1.4)
+for (i in 1:length(unique(meta$biogroup))) {
+        grp = levels(meta$biogroup)[i]
+        idx = which(as.character(meta$biogroup) == grp)
+        set.seed(seed)
+        xjitter=jitter(rep(i,length(idx)),amount=0.2)
+        points(y=meta$autosome_depth[idx], x=xjitter, pch=21, col="grey30", bg=alpha("grey30",0.6),lwd=1.2,cex=1.4)
+}
+#dev.off()
+
+--- end R code ---
+
+
+#
+#
+#
+
+
 ## ---------- RELATEDNESS ESTIMATED FROM GENOMIC DATA ---------- ##
 
 Estimate relatedness among all sequenced individuals.
@@ -1004,10 +1198,37 @@ donor.rmat <- rmat[which(colnames(rmat) %in% donor.id == TRUE), which(colnames(r
 
 --- end R code ---
 
+--- start R code ---
+
+
+## Make relatedness-pruned subsets of individuals (all pairwise r is <= 0.4, i.e. no first degree relatives)
+
+Subset relatedness matrices by removing particular individuals that should be excluded prior to r-pruning
+
+--- start R code ---
+
+# remove T_072 (RSW-K) from donor pop relatedness matrix because this individual was not translocated
+donor.mat <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs/donor_pops_relatedness_matrix.txt',head=TRUE)
+trans.mat <- donor.mat[- which(colnames(donor.mat) == "T_072"), - which(colnames(donor.mat) == "T_072")]
+write.table(trans.mat,file='/mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/unrelated_subsets/translocated_relatedness_matrix.txt',col.names=TRUE,row.names=FALSE,quote=FALSE,sep="\t")
+
+# remove E_030 (K-SRB) from resident relatendess matrix because this is an F1 between a site 12 father and CR resident mother
+res.mat <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs/resident_cr_relatedness_matrix.txt',head=TRUE)
+res.sub.mat <- res.mat[-which(colnames(res.mat) == "E_030"), -which(colnames(res.mat) == "E_030")]
+rite.table(res.sub.mat,file='/mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/unrelated_subsets/resident_cr_noE030_matrix.txt',col.names=TRUE,row.names=FALSE,quote=FALSE,sep="\t")
+
+--- end R code ---
+
+
 Take random subsets of individuals such that the max pairwise r within each group is <= 0.4
 
 --- start bash code ---
 
+$ /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/scripts/subsetUnrelated.R /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/unrelated_subsets/translocated_relatedness_matrix.txt 0.4 328974 > /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/unrelated_subsets/translocated_relatedness_maxr0.4_ids_seed328974.txt
+$ /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/scripts/subsetUnrelated.R /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/unrelated_subsets/resident_cr_noE030_matrix.txt 0.4 836241 > /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/unrelated_subsets/resident_cr_noE030_relatedness_maxr0.4_ids_seed836241.txt
+
+The following subsets were created and are stored in the HPCC directory '/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs' (they were generated 
+during the ROH analyses and then used subsequently):
 $ /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/scripts/subsetUnrelated.R contemporary_cr_relatedness_matrix.txt 0.4 836241 > contemporary_cr_relatedness_maxr0.4_ids.txt
 $ /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/scripts/subsetUnrelated.R resident_cr_relatedness_matrix.txt 0.4 836241 > resident_cr_relatedness_maxr0.4_ids.txt
 $ /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/scripts/subsetUnrelated.R site13_relatedness_matrix.txt 0.4 836241 > site13_relatedness_maxr0.4_ids.txt
@@ -1076,20 +1297,15 @@ trans.unrelated.df <- data.frame(ID=gsub("\\.Site.+|\\.Texaco","",trans.unrelate
 
 --- end R code ---
 
-Unrelated (r <= 0.01) sample sizes:
-contemporary CR, n = 6
-resident CR, n = 6
-translocated, n = 8
-
 
 #
 #
 #
 
 
-## ---------- SITE FREQUENCY SPECTRUM ---------- ##
+## ---------- SITE FREQUENCY SPECTRUM FOR QUALITY CONTROL ---------- ##
 
-# Folded SFS calculated from all sites (best SFS estimate, used for estimating genetic diversity)
+# Folded maximum likelihood SFS calculated from all sites as a data sanity check
 
 Estimate per site allele frequency likelihoods for all quality controlled sites
 
@@ -1285,13 +1501,14 @@ FST were calculated using variable sites only
 
 Estimate allele frequency likelihoods for quality-controlled SNPs
 Note: the 'translocated' group for FST estimation includes RSW-K (T_072, no translocated) and so really represents the pooled donor sites
+while the 'translocated_CR' group excluded RSW-K and so is only translocated jays.
 
 $ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/main_autosome_snps_grp_sfs_array2.sh
 implements:
 
 --- start bash code ---
 
-GRP_ARR=('resident' 'translocated' 'C')
+GRP_ARR=('resident' 'translocated' 'C' 'translocated_CR')
 FSJGRP="${GRP_ARR[$SLURM_ARRAY_TASK_ID]}"
 BAMLIST="/mnt/research/Fitz_Lab/projects/mosaic/map/mosaic_${FSJGRP}_bam_list.txt"
 OUTPREFIX="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_biallelic_snps_main_autosomes_qc_${FSJGRP}"
@@ -1315,7 +1532,7 @@ implements:
 
 --- start bash code ---
 
-CMP=('resident:C' 'resident:translocated' 'translocated:C')
+CMP=('resident:C' 'resident:translocated' 'translocated_CR:C')
 POP1=$(echo "${CMP[$SLURM_ARRAY_TASK_ID]}" | cut -f1 -d':')
 POP2=$(echo "${CMP[$SLURM_ARRAY_TASK_ID]}" | cut -f2 -d':')
 SAFIDX1="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_biallelic_snps_main_autosomes_qc_${POP1}.saf.idx"
@@ -1330,14 +1547,14 @@ eval $CMD
 
 --- end bash code ---
 
-# Estimate pairwise FST for {resident CR vs contemporary CR} and {resident vs pooled donor sites}
+# Estimate pairwise FST for {resident CR vs donor populations}, {CR contemporary vs CR resident}, {CR contemporary vs CR translocated group}
 
-$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/main_autosome_snps_2dsfs_array2.sh
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/pairwise_fst_array2.sh
 implements:
 
 --- start bash code ---
 
-CMP=('resident:C' 'resident:translocated' 'translocated:C')
+CMP=('resident:C' 'resident:translocated' 'translocated_CR:C')
 POP1=$(echo "${CMP[$SLURM_ARRAY_TASK_ID]}" | cut -f1 -d':')
 POP2=$(echo "${CMP[$SLURM_ARRAY_TASK_ID]}" | cut -f2 -d':')
 SAFIDX1="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_biallelic_snps_main_autosomes_qc_${POP1}.saf.idx"
@@ -1353,6 +1570,8 @@ eval $CMD
 
 --- end bash code ---
 
+Reported the "Fst.Weight" values.
+
 
 #
 #
@@ -1363,11 +1582,10 @@ eval $CMD
 
 ## Heterozygosity
 
-Estimate heterozygosity from each individual's site frequency spectrum.
+Estimate posterior expected H for each sample from their allele frequency posterior probabilities using FROH (see below for calculation)
+in the genotype prior. This estimation accounts for inbreeding and does not assume Hardy-Weinberg equilibrium.
 
-# Estimate allele frequency (0, 1, or 2 minor alleles) likelihoods at each site
-
-$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/theta/heterozygosity/heterozygosity_array.sh
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/theta/heterozygosity/Froh_H/scripts/heterozygosity_froh_pop_specific_baq_array.sh
 implements:
 
 --- start bash code ---
@@ -1379,29 +1597,307 @@ SAMP=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$SAMPLIST")
 REF='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ.V3.fa'
 REGFILE='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ_V3_main_autosomes.txt'
 SITESFILE='/mnt/research/Fitz_Lab/projects/mosaic/variants/vcf/all_sites/fsj_mosaic_allsites_main_autosomes_qc.pos'
-OUTPREFIX="/mnt/research/Fitz_Lab/projects/mosaic/popgen/theta/heterozygosity/fsj_mosaic_allsites_main_autosomes_qc_${SAMP}"
+OUTPREFIX="/mnt/research/Fitz_Lab/projects/mosaic/popgen/theta/heterozygosity/Froh_H/sfs/pop_specific/${SAMP}_allsites_main_autosomes_qc_Froh_pop_specific_baq"
+FFILE="/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/individual_f_files/${SAMP}_biallelic_snps_main_autosomes_qc_pop_specific_af_Froh.txt"
+EXEC='/mnt/research/Fitz_Lab/projects/mosaic/popgen/theta/heterozygosity/ngsF_H/scripts/saf2H.pl'
+EXEC2='/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/revision1_sfs/saf2sfs.pl'
 
-SAFCMD="angsd -i $BAMFILE -out $OUTPREFIX -GL 1 -doSaf 1 -anc $REF -minQ 20 -minMapQ 20 -rf $REGFILE -sites $SITESFILE"
+SAFCMD="angsd -i $BAMFILE -baq 1 -C 50 -ref $REF -out $OUTPREFIX -GL 1 -doSaf 2 -indF $FFILE -anc $REF -doMaf 1 -doMajorMinor 1 -minQ 20 -minMapQ 20 -remove_bads 1 -only_proper_pairs 1 -rf $REGFILE -sites $SITESFILE -P 4"
 
 printf "\n%s\n\n" "$SAFCMD"
 
 eval $SAFCMD
+wait
+
+HCMD="realSFS print ${OUTPREFIX}.saf.idx | $EXEC > ${OUTPREFIX}_H.txt"
+
+printf "\n%s\n\n" "$HCMD"
+
+eval $HCMD
+wait
+
+SFSCMD="realSFS print ${OUTPREFIX}.saf.idx | $EXEC2 0 > ${OUTPREFIX}_unfold.sfs"
+
+printf "\n%s\n\n" "$SFSCMD"
+
+eval $SFSCMD
 
 --- end bash code ---
 
-# Estimate SFS for individuals
 
-$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/theta/heterozygosity/heterozygosity_realsfs_array.sh
-implements:
+H estimates calculated above where stored in the M4_sequenced_FSJsamples_metadata.txt and in the 'H' field of the M4_sequenced_individual_metadata.tsv file 
+deposited to dryad.
+
+# Visualize H distrubutions with boxplots (Figure 3C)
+
+--- start R code ---
+
+library(scales)
+
+# read in data
+
+meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
+
+# set up plotting features
+
+meta$biopoint = biopoint(meta$pop)
+meta$popcol <- popcolor(meta)
+
+meta$group <- replace(meta$pop, which(meta$pop == "Golden_Aster_Scrub" | meta$pop == "Brigman" | meta$pop == "W.Balm" | 
+meta$pop == "Duette_headwaters" | meta$pop == "Sun_City"), "M4")
+
+meta$group <- replace(meta$group, which(meta$group == "SITE_1" | meta$group == "SITE_12" | meta$group == "SITE_13" | 
+meta$group == "SITE_18" | meta$group == "TEXACO"), "Translocated")
+
+meta$group = factor(meta$group, levels=c("Contemporary", "Resident", "Translocated", "M4"))o
+
+# omit T_072 (RSW-K) because this site 1 bird was not translocated and migrated to LMSP, which is outside of the Core
+meta.sub <- meta[-which(meta$LAB_ID == "T_072"),]
+
+# H boxplot
+
+range(meta$H) # set limits to exceed these values
+#[1] 0.000532 0.001462
+
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/H_postexp_distribution_Froh_pop_specific_af_baq.png',width=7, height=7,units='in', res=300)
+h_boxplot3(x=meta.sub, n=23, lev=levels(meta.sub$group), ylabel="Heterozygosity per site", pntlab=meta.sub$biopoint, seed=10287, color=meta.sub$popcol, ylimits=c(0.0005,0.0016), labpos=c(0.8,1.95,3,4))
+#dev.off()
+
+# make plot with ID labels
+#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/figures/H_postexp_distribution_Froh_pop_specific_af_baq_ids.pdf',width=7, height=7)
+h_boxplot3(x=meta.sub, n=23, lev=levels(meta.sub$group), ylabel="Heterozygosity per site", pntlab=NULL, seed=10287, color=meta.sub$popcol, ylimits=c(0.0005,0.0016), 
+labpos=c(0.8,1.95,3,4), idlabels=meta.sub$LAB_ID)
+#dev.off()
+
+---- end R code ---
+
+
+# Check for relationships between H and sequence depth and test for differences in mean H between groups
+
+--- start R code ---
+
+library(boot)
+library(scales) # for alpha
+
+# read in data with H estimates
+meta <- read.table("/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt", head=TRUE)
+
+# read in subsets of indivdiuals for which all pairwise relatedness was < 0.4
+
+res.prune2 <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/unrelated_subsets/resident_cr_noE030_relatedness_maxr0.4_ids_seed836241.txt',head=FALSE)$V1 # excludes K-SRB
+trans.prune <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/unrelated_subsets/translocated_relatedness_maxr0.4_ids_seed328974.txt',head=FALSE)$V1
+contemp.prune <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/inputs/contemporary_cr_relatedness_maxr0.4_ids.txt',head=FALSE)$V1 # this is not necessary because all contemporary individuals are related with r < 0.4
+
+# define groups to test differences between
+
+# Test for differences in H between groups
+colnames(meta)[which(colnames(meta) == "pop_name_full")] = "POPULATION" # this is just so column names match the released metadata
+meta$group = replace(meta$POPULATION, which(meta$POPULATION == "contemporary_Core_Region"), "contemporary_cr")
+meta$group = replace(meta$group, which(meta$group == "resident_Core_Region"), "resident_cr")
+meta$group = replace(meta$group, which(meta$group == "Site_1" | meta$group == "Site_12" | meta$group == "Site_13" | meta$group == "Site_18" | meta$group == "Texaco"), "donor")
+meta$group = replace(meta$group, which(meta$group == "Golden_Aster_Scrub" | meta$group == "Brigman" | meta$group == "West_Balm" | meta$group == "Duette_Headwaters" | meta$group == "Sun_City"), "other_m4")
+
+meta.sub = meta[-which(meta$LAB_ID == "T_072"),] # omit T_072 because this site 1 bird was not translocated into the CR. All donor site birds in this dataframe were translocated.
+meta.sub2 = meta.sub[-which(meta.sub$LAB_ID == "E_030"),] # omit E_030 (K-SRB) because this CR LR "resident" was the offspring of a site 12 father and CR resident mother
+
+# Test for correlation between H and depth
+
+hvd_fit <- lm(formula = meta$H ~ meta$autosome_depth)
+
+summary(hvd_fit)
+#
+#Call:
+#lm(formula = meta$H ~ meta$autosome_depth)
+#
+#Residuals:
+#       Min         1Q     Median         3Q        Max 
+#-2.656e-04 -1.584e-04 -1.258e-05  1.086e-04  6.281e-04 
+#
+#Coefficients:
+#                     Estimate Std. Error t value Pr(>|t|)    
+#(Intercept)         7.041e-04  1.423e-04   4.947 3.77e-06 ***
+#meta$autosome_depth 1.530e-05  1.935e-05   0.791    0.431    
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+#
+#Residual standard error: 0.0001843 on 85 degrees of freedom
+#Multiple R-squared:  0.007303,	Adjusted R-squared:  -0.004376 
+#F-statistic: 0.6253 on 1 and 85 DF,  p-value: 0.4313
+
+#hist(resid(hvd_fit),breaks=20)
+
+shapiro.test(resid(hvd_fit)) # errors are a bit skewed so will use bootstrap to check significance
+#
+#	Shapiro-Wilk normality test
+#
+#data:  resid(hvd_fit)
+#W = 0.93925, p-value = 0.0004916
+
+set.seed(83816711)
+hvd.boot <- boot(data.frame(x=meta$autosome_depth, y=meta$H), getBeta1, R=10000, stype="i", sim="ordinary")
+hvd.ci <- boot.ci(hvd.boot, conf=0.95, type=c("perc","bca"))
+
+hvd.ci$bca
+#     conf                                          
+#[1,] 0.95 159.51 9637.59 -2.240671e-05 7.343164e-05
+
+# standardize depth and H to ensure that there are no problems with effect size precision
+h.std = (meta$H-mean(meta$H))/sd(meta$H)
+depth.std = (meta$autosome_depth - mean(meta$autosome_depth))/sd(meta$autosome_depth)
+hvd_std_fit = lm(h.std ~ depth.std)
+set.seed(83816711)
+hvd_std.boot <- boot(data.frame(x=depth.std, y=h.std), getBeta1, R=10000, stype="i", sim="ordinary")
+hvd_std.ci <- boot.ci(hvd_std.boot, conf=0.95, type=c("perc","bca"))
+
+hvd_std.ci
+#BOOTSTRAP CONFIDENCE INTERVAL CALCULATIONS
+#Based on 10000 bootstrap replicates
+#
+#CALL : 
+#boot.ci(boot.out = hvd_std.boot, conf = 0.95, type = c("perc", 
+#    "bca"))
+#
+#Intervals : 
+#Level     Percentile            BCa          
+#95%   (-0.1109,  0.4406 )   (-0.1220,  0.4117 )  
+#Calculations and Intervals on Original Scale
+
+# The unstandardized and standardized results are consistent
+
+# Plot H vs depth (Fig. S7D)
+
+biotype_col = bioclass_col(meta$POPULATION)
+
+range(meta$H) # for setting y-lilmits
+#[1] 0.000532 0.001462
+
+#png(file="/home/tyler/Dropbox/research/jay/mosaic/figures/methods_evaluation/H_post_exp_froh_pop_specific_baq_v_depth.png", width=7, height=7, units='in', res=300)
+par(mgp=c(2.65,1,0))
+plot(x = meta$autosome_depth, y = meta$H, cex=1.5, pch=21, col=biotype_col, bg=alpha(biotype_col,0.6), xlab="Average sequencing depth",
+ylab=expression(paste("Posterior expected ", italic("H"))),cex.lab=1.5, cex.axis=1.5, ylim=c(0.0005,0.0015))
+abline(a=hvd_fit$coefficients[1], b=hvd_fit$coefficients[2], col="gray40")
+legend('topright',legend=c("Contemporary CR","Resident CR","Donor population","Other M4"), fill=c("hotpink2","purple2","dodgerblue2","gold2"),bty='n',cex=1.2)
+text(x=11,y=0.00093,label=bquote(italic(r)^2 == .(round(summary(hvd_fit)$r.square, digits=5))), cex=1.3)
+#dev.off()
+
+# test if H for different groups is approximately normally distributed
+
+# all contemporary
+shapiro.test(meta.sub$H[which(meta.sub$group == "contemporary_cr")])
+#
+#	Shapiro-Wilk normality test
+#
+#data:  meta.sub$H[which(meta.sub$group == "contemporary_cr")]
+#W = 0.96922, p-value = 0.5597
+
+# resident r-pruned without E_030 - deviates a bit from normal, but will still use t-test to compare means because of its robustness to minor deviations from normal
+shapiro.test(meta$H[which(meta$LAB_ID %in% res.prune2 == TRUE)])
+#
+#	Shapiro-Wilk normality test
+#
+#data:  meta$H[which(meta$LAB_ID %in% res.prune2 == TRUE)]
+#W = 0.86993, p-value = 0.05219
+
+# translocated r-pruned
+shapiro.test(meta$H[which(meta$LAB_ID %in% trans.prune == TRUE)])
+#
+#	Shapiro-Wilk normality test
+#
+#data:  meta$H[which(meta$LAB_ID %in% trans.prune == TRUE)]
+#W = 0.93402, p-value = 0.3131
+
+# Test for differences in mean H between groups
+
+# all contemporary vs all resident without E_030
+
+
+# contemporary vs r-pruned residents without E_030
+t.test(x=meta$H[which(meta$LAB_ID %in% contemp.prune == TRUE)], y=meta$H[which(meta$LAB_ID %in% res.prune2 == TRUE)], alternative="two.sided")
+#
+#	Welch Two Sample t-test
+#
+#data:  meta$H[which(meta$LAB_ID %in% contemp.prune == TRUE)] and meta$H[which(meta$LAB_ID %in% res.prune2 == TRUE)]
+#t = -5.6624, df = 13.352, p-value = 7.018e-05
+#alternative hypothesis: true difference in means is not equal to 0
+#95 percent confidence interval:
+# -0.0003871193 -0.0001737158
+#sample estimates:
+#   mean of x    mean of y 
+#0.0006414286 0.0009218462 
+
+
+# contemporary vs r-pruned translocated
+t.test(x=meta$H[which(meta$LAB_ID %in% contemp.prune == TRUE)], y=meta$H[which(meta$LAB_ID %in% trans.prune == TRUE)], alternative="two.sided")
+#
+#	Welch Two Sample t-test
+#
+#data:  meta$H[which(meta$LAB_ID %in% contemp.prune == TRUE)] and meta$H[which(meta$LAB_ID %in% trans.prune == TRUE)]
+#t = -5.7909, df = 16.23, p-value = 2.607e-05
+#alternative hypothesis: true difference in means is not equal to 0
+#95 percent confidence interval:
+# -0.0003331808 -0.0001547621
+#sample estimates:
+#   mean of x    mean of y 
+#0.0006414286 0.0008854000 
+
+# r-pruned resident without E_030 vs translocated
+t.test(x=meta$H[which(meta$LAB_ID %in% res.prune2 == TRUE)], y=meta$H[which(meta$LAB_ID %in% trans.prune == TRUE)], alternative="two.sided")
+#
+#	Welch Two Sample t-test
+#
+#data:  meta$H[which(meta$LAB_ID %in% res.prune2 == TRUE)] and meta$H[which(meta$LAB_ID %in% trans.prune == TRUE)]
+#t = 0.57849, df = 24.489, p-value = 0.5682
+#alternative hypothesis: true difference in means is not equal to 0
+#95 percent confidence interval:
+# -9.344712e-05  1.663394e-04
+#sample estimates:
+#   mean of x    mean of y 
+#0.0009218462 0.0008854000 
+
+# group H summary statistics
+
+# contemporary CR population
+mean(meta$H[which(meta$LAB_ID %in% contemp.prune == TRUE)])
+#[1] 0.0006414286
+sd(meta$H[which(meta$LAB_ID %in% contemp.prune == TRUE)])
+#[1] 6.012113e-05
+
+# r-pruned residents CR population excluding E_030
+mean(meta$H[which(meta$LAB_ID %in% res.prune2 == TRUE)])
+#[1] 0.0009218462
+sd(meta$H[which(meta$LAB_ID %in% res.prune2 == TRUE)])
+#[1] 0.0001737948
+
+# r-pruned translocated jays
+mean(meta$H[which(meta$LAB_ID %in% trans.prune == TRUE)])
+#[1] 0.0008854
+sd(meta$H[which(meta$LAB_ID %in% trans.prune == TRUE)])
+#[1] 0.0001571245
+
+--- end R code ---
+
+
+## Population nucleotide diversity (pi/Tajima's theta)
+
+First calculate an estimate of the genome-wide SFS for each group that accounts for indivivdual inbreeding and 
+which does not assume HWE.
+
+Estimate per site allele frequency probabilities
+sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/revision1_sfs/main_autosome_af_postprob.sh
+which implements:
 
 --- start bash code ---
 
-SAMPLIST='/mnt/research/Fitz_Lab/projects/mosaic/mosiac_ids.txt'
-SAMP=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$SAMPLIST")
-SAFIDX="/mnt/research/Fitz_Lab/projects/mosaic/popgen/theta/heterozygosity/fsj_mosaic_allsites_main_autosomes_qc_${SAMP}.saf.idx"
-SFS="/mnt/research/Fitz_Lab/projects/mosaic/popgen/theta/heterozygosity/fsj_mosaic_allsites_main_autosomes_qc_${SAMP}.fold.sfs"
+INFILES='/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/revision1_sfs/input_lists.txt'
+ID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $INFILES | cut -f1)
+BAMLIST=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $INFILES | cut -f2)
+FFILE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $INFILES | cut -f3)
+OUTPREFIX="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/revision1_sfs/${ID}_allsites_main_autosomes_qc_postprobs"
+REGFILE='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ_V3_main_autosomes.txt'
+SITESFILE='/mnt/research/Fitz_Lab/projects/mosaic/variants/vcf/all_sites/fsj_mosaic_allsites_main_autosomes_qc.pos'
+REF='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ.V3.fa'
 
-CMD="realSFS $SAFIDX -fold 1 -P 12 > $SFS"
+CMD="angsd -bam $BAMLIST -out $OUTPREFIX -GL 1 -doSaf 2 -indF $FFILE -anc $REF -doMaf 1 -doMajorMinor 1 -minQ 20 -minMapQ 20 -rf $REGFILE -sites $SITESFILE -P 4"
 
 printf "\n%s\n\n" "$CMD"
 
@@ -1409,208 +1905,77 @@ eval $CMD
 
 --- end bash code ---
 
-Collect SFS for all samples into a single file
 
---- begin bash code ---
+Estimate the genome-wide SFS
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/revision1_sfs/calc_posterior_expected_sfs_array.sh
+implements:
 
-$ for i in {1..87}; do SAMP=$(sed -n "${i}p" /mnt/research/Fitz_Lab/projects/mosaic/mosiac_ids.txt); sfs=$((printf "%s " "$SAMP" && head -n1 fsj_mosaic_allsites_main_autosomes_qc_${SAMP}.fold.sfs) | tr ' ' \\t | cut -f1-3); echo "$sfs" >> fsj_mosaic_allsites_main_autosomes_qc_all.fold.sfs; done
+--- start bash code ---
+
+EXEC='/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/revision1_sfs/saf2sfs.pl'
+GRP_ARR=('contemporary' 'resident' 'resident_prune' 'translocated' 'translocated_prune')
+FSJGRP="${GRP_ARR[$SLURM_ARRAY_TASK_ID]}"
+SAFIDX="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/revision1_sfs/${FSJGRP}_allsites_main_autosomes_qc_postprobs.saf.idx"
+OUTSFS="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/revision1_sfs/${FSJGRP}_allsites_main_autosomes_qc_postprobs_fold.sfs"
+
+CMD="realSFS print $SAFIDX | $EXEC 1 > $OUTSFS"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
 
 --- end bash code ---
 
-# Calculate H from individual SFS and visualize H distrubutions with boxplots
+
+Calculate nucleotide diversity using the SFS above as a prior probability for the site allele frequencies
+
+$ sbatch icer_hpcc:/mnt/research/Fitz_Lab/projects/mosaic/popgen/theta/revision1_theta/thetas_expost_sfs_array.sh
+implements:
+
+--- start bash code ---
+
+GRP_ARR=('contemporary' 'resident' 'resident_prune' 'translocated' 'translocated_prune')
+FSJGRP="${GRP_ARR[$SLURM_ARRAY_TASK_ID]}"
+SAFIDX="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/revision1_sfs/${FSJGRP}_allsites_main_autosomes_qc_likes.saf.idx"
+SFS="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/revision1_sfs/${FSJGRP}_allsites_main_autosomes_qc_postprobs_fold.sfs"
+OUTFILE="/mnt/research/Fitz_Lab/projects/mosaic/popgen/theta/revision1_theta/${FSJGRP}_allsites_main_autosomes_qc_expost"
+THETAIDX="${OUTFILE}.thetas.idx"
+
+CMD="realSFS saf2theta $SAFIDX -outname $OUTFILE -sfs $SFS -fold 1"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
+wait
+
+CMD2="thetaStat do_stat $THETAIDX"
+
+printf "\n%s\n\n" "$CMD2"
+
+eval $CMD2
+
+--- end bash code ---
+
+Transform the theta estimates from above (which includes pi) into a per site estimate of theta
 
 --- start R code ---
 
-library(scales) # for alpha
+grp=c('contemporary','resident','resident_prune','translocated','translocated_prune')
+path='/mnt/research/Fitz_Lab/projects/mosaic/popgen/theta/revision1_theta'
+suffix='_allsites_main_autosomes_qc_expost.thetas.idx.pestPG'
 
-# read in metapop data
-meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
-meta$popletter <- popletters(meta)
-meta$popcol <- popcolor(meta)
-
-groups <- meta$pop
-grplevels <- c("Contemporary", "Resident", "Translocated", "M4")
-
-groups <- replace(groups, which(groups == "Golden_Aster_Scrub" | groups == "Brigman" | groups == "W.Balm" | 
-groups == "Duette_headwaters" | groups == "Sun_City"), "M4")
-
-groups <- replace(groups, which(groups == "SITE_1" | groups == "SITE_12" | groups == "SITE_13" | 
-groups == "SITE_18" | groups == "TEXACO"), "Translocated")
-
-allsites <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/theta/fsj_mosaic_allsites_main_autosomes_qc_all.fold.sfs',head=FALSE) # H all sites
-
-## calculate H
-allsites$H <- sapply(1:nrow(allsites), function(x,df){df[x,3]/sum(df[x,2:3])},df=allsites)
-allsites$group = factor(groups,levels=grplevels)
-
-# omit T_072 (RSW-K) from plots and statistical tests because this site 1 bird was not translocated and migrated to LMSP, which is outside of the Core
-allsites <- allsites[-which(allsites$V1 == "T_072"),]
-meta <- meta[-which(meta$LAB_ID == "T_072"),]
-
-## H boxplots - Figure 3C
-
-# set point type
-pointcode <- meta$popletter
-pointcode <- replace(pointcode, which(pointcode == "C" | pointcode == "R"),NA)
-allsites$biopoint = biopoint(meta$pop)
-snps$biopoint = biopoint(meta$pop)
-
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/H_distribution.png',width=7, height=7,units='in', res=300)
-h_boxplot2(x=allsites, n=4, lev=grplevels, ylabel="Heterozygosity per site", pntlab=allsites$biopoint, seed=10287, color=meta$popcol, ylimits=NULL)
-dev.off()
-
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/H_distribution_text.png',width=7, height=7,units='in', res=300)
-h_boxplot2(x=allsites, n=4, lev=grplevels, ylabel="Heterozygosity per site", pntlab=NULL, seed=10287, color=meta$popcol, ylimits=NULL, idlabels=allsites$V1)
-dev.off()
-
-## write H results
-allsites$pop <- meta$pop
-colnames(allsites) <- c("SAMPLE", "N_HOMO_SITES", "N_HET_SITES", "H", "CLASS", "POPULATION")
-#write.table(allsites,file='/home/tyler/Dropbox/research/jay/mosaic/popgen/theta/fsj_mosaic_allsites_main_autosomes_qc_all.fold.sfs.het2',col.names=TRUE,row.names=FALSE,quote=FALSE,sep="\t")
-
-## summarize heterozygosity and test for differences between groups with first degree relatives excluded, specifically no pairwise r > 0.4
-
-contemp.unrelate <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/inputs/contemporary_cr_relatedness_maxr0.4_ids.txt', head=FALSE)$V1 # this is all contemporary individuals because all pairwise relatedness was < 0.4
-res.unrelate <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/inputs/resident_cr_relatedness_maxr0.4_ids.txt', head=FALSE)$V1
-donor.unrelate <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/inputs/donor_pops_relatedness_maxr0.4_ids.txt', head=FALSE)$V1
-histmeta.unrelate <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/inputs/historic_metapop_relatedness_maxr0.4_ids.txt', head=FALSE)$V1
-
-# Group H summary stats (individuals comprising groups are subsets such that all pairwise r <= 0.4).
-
-# Contemporary (all pairwise r <= 0.4)
-mean(allsites$H[which(allsites$CLASS == "Contemporary" & allsites$SAMPLE %in% contemp.unrelate == TRUE)])
-#[1] 0.0002010206
-sd(allsites$H[which(allsites$CLASS == "Contemporary" & allsites$SAMPLE %in% contemp.unrelate == TRUE)])
-#[1] 1.846997e-05
-range(allsites$H[which(allsites$CLASS == "Contemporary" & allsites$SAMPLE %in% contemp.unrelate == TRUE)])
-#[1] 0.0001593255 0.0002332972
-
-# Resident (all pairwise r <= 0.4)
-mean(allsites$H[which(allsites$CLASS == "Resident" & allsites$SAMPLE %in% res.unrelate == TRUE)])
-#[1] 0.0002306068
-sd(allsites$H[which(allsites$CLASS == "Resident" & allsites$SAMPLE %in% res.unrelate == TRUE)])
-#[1] 2.077982e-05
-range(allsites$H[which(allsites$CLASS == "Resident" & allsites$SAMPLE %in% res.unrelate == TRUE)])
-#[1] 0.0001854781 0.0002576843
-
-# Translocated (all pairwise r <= 0.4)
-mean(allsites$H[which(allsites$CLASS == "Translocated" & allsites$SAMPLE %in% donor.unrelate == TRUE)])
-#[1] 0.0002138821
-sd(allsites$H[which(allsites$CLASS == "Translocated" & allsites$SAMPLE %in% donor.unrelate == TRUE)])
-#[1] 3.394935e-05
-range(allsites$H[which(allsites$CLASS == "Translocated" & allsites$SAMPLE %in% donor.unrelate == TRUE)])
-#[1] 0.0001607426 0.0002839456
-
-# Other M4
-mean(allsites$H[which(allsites$CLASS == "M4" & allsites$SAMPLE %in% histmeta.unrelate == TRUE)])
-#[1] 0.0002429067
-sd(allsites$H[which(allsites$CLASS == "M4" & allsites$SAMPLE %in% histmeta.unrelate == TRUE)])
-#[1] 3.167934e-05
-range(allsites$H[which(allsites$CLASS == "M4" & allsites$SAMPLE %in% histmeta.unrelate == TRUE)])
-#[1] 0.0001966109 0.0003019788
-
-# H for samples (for which all pairwise r <= 0.4) is normally distributed
-
-shapiro.test(allsites$H[which(allsites$CLASS == "Contemporary" & allsites$SAMPLE %in% contemp.unrelate == TRUE)])
-#
-#	Shapiro-Wilk normality test
-#
-#data:  allsites$H[which(allsites$group == "Contemporary" & allsites$SAMPLE %in% contemp.unrelate == TRUE)]
-#W = 0.96952, p-value = 0.5679
-
-shapiro.test(allsites$H[which(allsites$CLASS == "Resident" & allsites$SAMPLE %in% res.unrelate == TRUE)])
-#
-#	Shapiro-Wilk normality test
-#
-#data:  allsites$H[which(allsites$group == "Resident" & allsites$SAMPLE %in% res.unrelate == TRUE)]
-#W = 0.95371, p-value = 0.6196
-
-shapiro.test(allsites$H[which(allsites$CLASS == "Translocated" & allsites$SAMPLE %in% donor.unrelate == TRUE)])
-#
-#	Shapiro-Wilk normality test
-#
-#data:  allsites$H[which(allsites$group == "Translocated" & allsites$SAMPLE %in% donor.unrelate == TRUE)]
-#W = 0.97319, p-value = 0.9022
-
-shapiro.test(allsites$H[which(allsites$CLASS == "M4" & allsites$SAMPLE %in% histmeta.unrelate == TRUE)])
-#
-#	Shapiro-Wilk normality test
-#
-#data:  allsites$H[which(allsites$group == "M4" & allsites$SAMPLE %in% histmeta.unrelate == TRUE)]
-#W = 0.96109, p-value = 0.8096
-
-# Test for differences in mean H between groups after having removed relatedness > 0.4
-
-# Contemporary CR vs Resident CR
-t.test(x=allsites$H[which(allsites$CLASS == "Contemporary" & allsites$SAMPLE %in% contemp.unrelate == TRUE)], y=allsites$H[which(allsites$CLASS == "Resident" & allsites$SAMPLE %in% res.unrelate == TRUE)], alternative="two.sided")
-#
-#	Welch Two Sample t-test
-#
-#data:  allsites$H[which(allsites$CLASS == "Contemporary" & allsites$SAMPLE %in% contemp.unrelate == TRUE)] and allsites$H[which(allsites$CLASS == "Resident" & allsites$SAMPLE %in% res.unrelate == TRUE)]
-#t = -4.5105, df = 23.531, p-value = 0.0001503
-#alternative hypothesis: true difference in means is not equal to 0
-#95 percent confidence interval:
-# -4.313854e-05 -1.603385e-05
-#sample estimates:
-#   mean of x    mean of y 
-#0.0002010206 0.0002306068
-
-# Contemporary CR vs translocated
-t.test(x=allsites$H[which(allsites$CLASS == "Contemporary" & allsites$SAMPLE %in% contemp.unrelate == TRUE)], y=allsites$H[which(allsites$CLASS == "Translocated" & allsites$SAMPLE %in% donor.unrelate == TRUE)], alternative="two.sided")
-#
-#	Welch Two Sample t-test
-#
-#data:  allsites$H[which(allsites$CLASS == "Contemporary" & allsites$SAMPLE %in% contemp.unrelate == TRUE)] and allsites$H[which(allsites$CLASS == "Translocated" & allsites$SAMPLE %in% donor.unrelate == TRUE)]
-#t = -1.3632, df = 18.55, p-value = 0.1892
-#alternative hypothesis: true difference in means is not equal to 0
-#95 percent confidence interval:
-# -3.264187e-05  6.918801e-06
-#sample estimates:
-#   mean of x    mean of y 
-#0.0002010206 0.0002138821
-
-# Resident CR versus translocated
-t.test(x=allsites$H[which(allsites$CLASS == "Resident" & allsites$SAMPLE %in% res.unrelate == TRUE)], y=allsites$H[which(allsites$CLASS == "Translocated" & allsites$SAMPLE %in% donor.unrelate == TRUE)], alternative="two.sided")
-#
-#	Welch Two Sample t-test
-#
-#data:  allsites$H[which(allsites$CLASS == "Resident" & allsites$SAMPLE %in% res.unrelate == TRUE)] and allsites$H[which(allsites$CLASS == "Translocated" & allsites$SAMPLE %in% donor.unrelate == TRUE)]
-#t = 1.6117, df = 23.43, p-value = 0.1204
-#alternative hypothesis: true difference in means is not equal to 0
-#95 percent confidence interval:
-# -4.719847e-06  3.816916e-05
-#sample estimates:
-#   mean of x    mean of y 
-#0.0002306068 0.0002138821
-
---- end R code ---
-
-## Watterson's Theta and nucleotide diversity
-
---- start R code ---
-
-grps = c("C", "contemporary_unrelated", "resident", "resident_unrelated", "T", "translocated_unrelated", "M4")
-
-# T' is actually donor sites because it includes T_072 (RSW-K) who was from Site 1 but not translocated,
-# 'translocated_unrelated' are just translocated jays.
-# 'unrelated' groups are subsets of individuals for which all pairwise relatedness is <= 0.01
-
-fprefix="/mnt/research/Fitz_Lab/projects/mosaic/popgen/theta/fsj_mosaic_allsites_main_autosomes_qc"
-
+# read in theta estimates
 df = NULL
-for (g in grps) {
-        theta <- read.table(paste0(fprefix,"_",g,".thetas.idx.pestPG"))
-        nsites = sum(theta[,14])
-        theta$wt = theta[,14]/nsites
-        df=rbind(df, data.frame(Group=g, Theta_Watterson = sum(theta[,4])/nsites, Pi = sum(theta[,5])/nsites, TajimaD = sum(theta[,9]*theta$wt)))
+for (g in grp) {
+	theta <- read.table(paste0(path,"/",g,suffix))
+	nsites = sum(theta[,14])
+	theta$wt = theta[,14]/nsites
+	df=rbind(df, data.frame(Group=g, Theta_Watterson = sum(theta[,4])/nsites, Pi = sum(theta[,5])/nsites, TajimaD = sum(theta[,9]*theta$wt)))
 }
 
-# write output
-#write.table(df,file='/mnt/research/Fitz_Lab/projects/mosaic/popgen/theta/fsj_mosaic_allsites_main_autosomes_qc_genome_all_groups.thetas', col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
+#write.table(df, file='/mnt/research/Fitz_Lab/projects/mosaic/popgen/theta/revision1_theta/theta_estimates_postexp_sfs_prior.txt',col.names=TRUE,row.names=FALSE,sep="\t",quote=FALSE)
 
 --- end R code ---
-
-Reported thetas estimated using all contemporary CR and all resident CR individuals in the manuscript.
 
 
 #
@@ -1622,10 +1987,11 @@ Reported thetas estimated using all contemporary CR and all resident CR individu
 
 ## Individual inbreeding based on deviation from Hardy-Weinberg Equilibrium genotype frequencies
 
-The following describes calculating individual inbreeding coefficients, F, with ngsF based on allele frequencies 
-for the population specific to sets of individuals.
+I. The following describes estimation of individual inbreeding coefficients, F, with ngsF using population-specific allele 
+frequencies estimated with without relatedness-pruning (F visualized in Figuree S9). These values are in the 'F_PS_ALL' field of the 
+inbreed_coefficient_alternate_calculations.tsv file deposited to dryad.
 
-# Calculate genotype likelihoods for populations (includes all individuals for each population)
+Ia. # Calculate genotype likelihoods for populations (includes all individuals for each population)
 
 Genotype likelihoods for the Contemporary CR population
 
@@ -1711,7 +2077,9 @@ angsd -bam $BAMLIST -out $OUTPREFIX -GL 1 -doGlf 3 -doMaf 1 -doMajorMinor 1 -SNP
 --- end bash code ---
 
 
-# Calculate inbreeding coefficients with ngsF. This provides initital F estimates for all individuals.
+Ib. # Calculate inbreeding coefficients with ngsF. The F estimates from these calculations will also be used to initialize the EM calculations 
+for estimates that use allele frequencies estimated from unrelated subsets (see II).
+
 
 Calculate inbreeding coefficient for Contemporary CR individuals using Contemporary CR allele frequencies
 
@@ -1808,7 +2176,11 @@ eval $CMD
 --- end bash code ---
 
 
-# Estimate GLs for subsets from each population where all pairwise relatedness is <= 0.4.
+II. The following describes estimation of individual inbreeding coefficients, F, with ngsF using population-specific allele frequencies estimated 
+using subsets of individuals for which all pairwise r was <= 0.4 (relatedness pruned subsets, F is visualized in Figure 3B). These F estimates are in 
+the 'F' field of the M4_sequenced_individual_metadata.tsv file deposited to dryad.
+
+IIa. # Estimate GLs for subsets from each population where all pairwise relatedness is <= 0.4.
 
 $ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/binary_gl_maxr0.4_subset_array.sh
 implements:
@@ -1830,11 +2202,11 @@ eval $CMD
 
 --- end bash code ---
 
+IIb. # Estimate MAF estimates for r-pruned subsets while accounting for for inbreeding (jointy estimate MAF and F).
 
-# Estimate F and MAF for subsets of individuals that exclude first-degree relatives (all r <= 0.4). This provides more accurate MAF estimates that account for inbreeding.
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/maxr_0.4_groups_ngsf_inputs.txt/maxr_0.4_groups_ngsf_calc_array.sh
 
-$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/maxr_0.4_groups_ngsf_calc_array.sh
-implements:
+which implements
 
 --- start bash code ---
 
@@ -1854,10 +2226,9 @@ eval $CMD
 --- end bash code ---
 
 
-# Replace the MAF estimates in the ngsF parameter file generated from the analysis involving all individuals from each population group 
-# with MAF estimates from the analysis using only individuals from the respective group/population for which all pairwise r <= 0.4.
-
-workdir='/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats'
+IIc. # Replace the MAF estimates in the ngsF parameter file generated from the analysis using allele frequencies estimated using all individuals (Ib) 
+from each population group with MAF estimates from the r-pruned subset (IIb). These modified parameter files provide allele frequency estimates and initital F estimates
+to ngsF.
 
 $ ./scripts/replaceMaf 16,14 1168799 resident_cr_biallelic_snps_main_autosomes_qc_F.txt.pars resident_cr_maxr0.4_biallelic_snps_main_autosomes_qc_F.txt.pars resident_cr_biallelic_snps_main_autosomes_qc_F_modified_maf.par
 
@@ -1869,14 +2240,13 @@ $ ./scripts/replaceMaf 59,39 1787861 historic_metapop_biallelic_snps_main_autoso
 
 $ ./scripts/replaceMaf 19,10 855080 site13_biallelic_snps_main_autosomes_qc_F.txt.pars site13_maxr0.4_biallelic_snps_main_autosomes_qc_F.txt.pars site13_biallelic_snps_main_autosomes_qc_F_modified_maf.par
 
-# Calculate genotype likelihoods for all individuals in a group/population at sites segregating 
-# in the subsets with max r <= 0.4.
-
-The major and minor allele for the GL calculations was set according to the major/minor designations in the 
-subsets of individuals with relatedness <= 0.4.
+IId. # Calculate genotype likelihoods for all individuals in a group/population at sites segregating in the subsets with max r <= 0.4.
+The major and minor allele for the GL calculations was set according to the major/minor designations in the subsets of individuals with relatedness <= 0.4.
+These glf files provide the genotype likelihoods to ngsF and ensures that only sites that were segregating in the respective unrelated subset are analyzed.
 
 $ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/binary_gl_set_sites_array.sh
-implements:
+
+which implements
 
 --- start bash code ---
 
@@ -1895,8 +2265,8 @@ eval $CMD
 
 --- end bash code ---
 
-
-# Estimate F for all individuals with fixed MAF.
+IIe. Estimate F using population-specific allele frequencies estimated for subsets of unrelated individuals (these MAF estimates 
+are fixed and not restimated jointly with F).
 
 $ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/pop_specific_fixed_maf_ngsf_calc_array.sh
 implements:
@@ -1920,10 +2290,10 @@ eval $CMD
 --- end bash code ---
 
 
-Attach individual identity to the output of ngsF and collate results that use population specific allele frequencies. 
+IIf. Attach individual identity to the output of ngsF and collate results that use population specific allele frequencies. 
 Note that {site1, site12, site18, Texaco} used allele frequencies from the pool of all donor sites and all 'other' M4 
 individuals used allele frequencies of the historic metapopulation (all jays sampled from 2003-2008). Allele frequencies 
-were estimated after removing first degree relationships.
+were estimated after removing first degree relationships (all genetic pairwise r were < 0.4).
 
 --- start R code ---
 
@@ -1973,7 +2343,7 @@ for (i in 1:nrow(combF)) {
 	} else if (pop == "SITE_1" || pop == "SITE_12" || pop == "SITE_18" || pop == "TEXACO") {
 		combF$F_POP_SPECIFIC_AF[i] <- combF$F_DONOR_AF[i]
 	} else if (pop == "Golden_Aster_Scrub" || pop == "Brigman" || pop == "W.Balm" || pop == "Duette_headwaters" || pop == "Sun_City") {
- 		combF$F_POP_SPECIFIC_AF[i] <- combF$F_HISTORIC_METAPOP_AF[i]
+		combF$F_POP_SPECIFIC_AF[i] <- combF$F_HISTORIC_METAPOP_AF[i]
 	} else {
 		stop(paste0("Unknown population ",pop))
 	}
@@ -1984,49 +2354,126 @@ for (i in 1:nrow(combF)) {
 
 --- end R code ---
 
+The "F_POP_SPECIFIC_AF" F estimates in the fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_pop_specific_ref_AF_fixedMAF.txt file 
+were stored in the metadata file M4_sequenced_FSJsamples_metadata.txt and used as the best estimates.
 
-## Statistical tests comparing F between groups
+III. The following describes estimation of individual inbreeding coefficients, F, with ngsF using metapopulation-wide allele frequencies 
+estimated without relatedness pruning (F visualized in Figure S9). These F estimates are in the 'F_META_ALL' of the inbreed_coefficient_alternate_calculations.tsv file 
+deposited to dryad.
+
+IIIa. Calculate genotype likelihoods for all samples
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/genotype_binary_likes.sh
+implements:
+
+--- start bash code ---
+
+BAMLIST='/mnt/research/Fitz_Lab/projects/mosaic/map/mosaic_bam_list.txt'
+REGFILE='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ_V3_main_autosomes.txt'
+SITESFILE='/mnt/research/Fitz_Lab/projects/mosaic/variants/vcf/biallelic_snps/fsj_mosaic_biallelic_snps_main_autosomes_qc.pos'
+OUTPREFIX='/mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_glf3'
+
+angsd -bam $BAMLIST -out $OUTPREFIX -GL 1 -doGlf 3 -doMajorMinor 1 -minQ 20 -minMapQ 20 -rf $REGFILE -sites $SITESFILE -P 16
+
+--- end bash code ---
+
+IIIb. Jointly estimate MAF and F using metapopulation-wide allele frequencies without relatedness pruning
+
+$ sbatch /mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/inbreed_coef.sh
+implements:
+
+--- start bash code ---
+
+GENOLIKES='/mnt/research/Fitz_Lab/projects/mosaic/popgen/genotypes/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_glf3.glf'
+OUTFILE='/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F.txt'
+
+CMD="ngsF --glf $GENOLIKES --init_values e --out $OUTFILE --n_ind 87 --n_sites 2049176 --max_iters 3000 --n_threads 20"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
+
+--- end bash code ---
+
+
+IV. Statistical tests comparing distributions of F between groups
+
+IVa. Tests with F estimated based on population-specific allele frequencies estimated using r-pruned subsets of individuals. Statistical 
+tests using subsets of individuals for which all pairwise r < 0.4.
 
 --- start R code ---
 
-# read in F values calculated using population-specific allele frequencies
+# read in F values calculated using population-specific allele frequencies. These F values are in the 'F' field of the M4_sequenced_individual_metadata.tsv file deposited to dryad.
 f.popaf <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_pop_specific_ref_AF_fixedMAF.txt', head=TRUE)
+# local version at /home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_pop_specific_ref_AF_fixedMAF.txt
 
 # read in IDs for subsets of individuals
-contemp.all <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs/contemporary_cr_ids.txt',head=FALSE)$V1 # pairwise relatedness between all of these samples is < 0.4, so is an "unrelated" sample for this analysis
-res.all <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs/resident_cr_ids.txt',head=FALSE)$V1
-res.unrelate <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs/resident_cr_relatedness_maxr0.4_ids.txt',head=FALSE)$V1
-donors.all <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs/donor_pops_ids.txt',head=FALSE)$V1
-trans.all <- donors.all[-which(donors.all == "T_072")] # all translocated individuals
-donors.unrelated <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs/donor_pops_relatedness_maxr0.4_ids.txt',head=FALSE)$V1
-trans.unrelated <- donors.unrelated[-which(donors.unrelated == "T_072")] # translocated individuals with no first degree relatives
 
-## F is not normally distributed
+res.prune2 <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/unrelated_subsets/resident_cr_noE030_relatedness_maxr0.4_ids_seed836241.txt',head=FALSE)$V1
+trans.prune <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/unrelated_subsets/translocated_relatedness_maxr0.4_ids_seed328974.txt',head=FALSE)$V1
+contemp.prune <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/inputs/contemporary_cr_relatedness_maxr0.4_ids.txt',head=FALSE)$V1
+contemp.all <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/inputs/contemporary_cr_ids.txt',head=FALSE)$V1 # identical to contemp.prune
+
+## F estimated based on population-specific allele frequencies (AF) estimated with relatedness pruning
+
+# test for whether F (pop-specific AF, no relatedness pruning) is normaly distributed using r-pruned subsets
 
 shapiro.test(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)])
 #
-#	Shapiro-Wilk normality test
+#       Shapiro-Wilk normality test
 #
 #data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)]
 #W = 0.43, p-value = 2.332e-09
 
-shapiro.test(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)])
+shapiro.test(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.prune2 == TRUE)])
 #
-#	Shapiro-Wilk normality test
+#       Shapiro-Wilk normality test
 #
-#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)]
-#W = 0.40247, p-value = 1.116e-06
+#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.prune2 == TRUE)]
+#W = 0.41822, p-value = 2.575e-06
 
-shapiro.test(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)])
+shapiro.test(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.prune == TRUE)])
 #
-#	Shapiro-Wilk normality test
+#       Shapiro-Wilk normality test
 #
-#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)]
-#W = 0.48591, p-value = 2.713e-06
+#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.prune == TRUE)]
+#W = 0.85813, p-value = 0.02268
 
-## F summary stats for different groups
+# test for differences in the distribution of F (pop-specific AF, no relatedness pruning) using r-pruned subsets
+
+#Contemporary vs Resident CR without E_030 after removing relatedness > 0.4
+wilcox.test(x=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.prune == TRUE)], y=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.prune2 == TRUE)], alternative="two.sided")
+#
+#       Wilcoxon rank sum exact test
+#
+#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.prune == TRUE)] and f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.prune2 == TRUE)]
+#W = 313, p-value = 0.0001046
+#alternative hypothesis: true location shift is not equal to 0
+
+
+# Contemporary versus translocated individuals after removing relatedness > 0.4
+wilcox.test(x=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.prune == TRUE)], y=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.prune == TRUE)], alternative="two.sided")
+#
+#       Wilcoxon rank sum exact test
+#
+#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.prune == TRUE)] and f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.prune == TRUE)]
+#W = 355, p-value = 0.000104
+#alternative hypothesis: true location shift is not equal to 0
+
+
+# Resident CR without E_030 versus translocated individuals after removing relatedness > 0.4
+wilcox.test(x=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.prune2 == TRUE)], y=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.prune == TRUE)], alternative="two.sided")
+#
+#       Wilcoxon rank sum exact test
+#
+#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.prune2 == TRUE)] and f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.prune == TRUE)]
+#W = 111, p-value = 0.5551
+#alternative hypothesis: true location shift is not equal to 0
+
+# F (pop-specific AF, no relatedness pruning) based on r-pruned subsets
 
 # All Contemporary CR individuals (all pairwise r < 0.4, i.e. no first degree relatives)
+
 mean(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)])
 #[1] 0.01538686
 sd(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)])
@@ -2034,83 +2481,284 @@ sd(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)])
 range(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)])
 #[1] 0.004188 0.136676
 
-# All resident CR individuals
-mean(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.all == TRUE)])
-#[1] 0.009614
-sd(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.all == TRUE)])
-#[1] 0.02067239
-range(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.all == TRUE)])
+# r-pruned residents without E_030
+mean(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.prune2 == TRUE)])
+#[1] 0.009823923
+sd(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.prune2 == TRUE)])
+#[1] 0.02285066
+range(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.prune2 == TRUE)])
 #[1] 0.001088 0.084474
 
-# Unrelated (r <= 0.4) resident CR individuals
-mean(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)])
-#[1] 0.0092825
-sd(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)])
-#[1] 0.02206545
-range(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)])
-#[1] 0.001088 0.084474
+# r-pruned translocated individuals
+mean(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.prune == TRUE)])
+#[1] 0.003400667
+sd(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.prune == TRUE)])
+#[1] 0.00289038
+range(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.prune == TRUE)])
+#[1] 0.000604 0.009123
 
-# all translocated individuals
-mean(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.all == TRUE)])
-#[1] 0.004774034
-sd(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.all == TRUE)])
-#[1] 0.007003384
-range(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.all == TRUE)])
-#[1] 0.000604 0.039239
 
-# Unrelated (r <= 0.4) translocated individuals
-mean(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)])
-#[1] 0.005556267
-sd(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)])
-#[1] 0.009559863
-range(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)])
-#[1] 0.000604 0.039239
+--- end R code ---
 
-## Test for differences in F distributions
+IVb. Tests with F estimated based on population-specific allele frequencies estimated without r-pruning. Statistical 
+tests used all individuals (excluding E_030 from the residents due to admixed ancestry).
 
-# Contemporary vs Resident CR after removing relatedness > 0.4
-wilcox.test(x=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)], y=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)], alternative="two.sided")
+--- start R code ---
+
+# read in F values calculated using population-specific allele frequencies. These are the values in the 'F_PS_ALL' column of the inbreed_coefficient_alternate_calculations.tsv file deposited to dryad.
+f.popaf <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_pop_specific_ref_AF.txt', head=TRUE)
+
+# read in sets of individuals (local copies)
+contemp.prune <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/inputs/contemporary_cr_relatedness_maxr0.4_ids.txt',head=FALSE)$V1
+contemp.all <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/inputs/contemporary_cr_ids.txt',head=FALSE)$V1
+res.all <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/inputs/resident_cr_ids.txt',head=FALSE)$V1
+res.all2 <- res.all[-which(res.all == "E_030")] # remove E_030 (K-SRB) from residents because this is an F1 between a site 12 father and CR resident mother
+donors.all <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/inputs/donor_pops_ids.txt',head=FALSE)$V1
+trans.all <- donors.all[-which(donors.all == "T_072")] # all translocated individuals
+
+# test whether F is normally distributed
+
+shapiro.test(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)])
 #
-#	Wilcoxon rank sum exact test
+#       Shapiro-Wilk normality test
 #
-#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)] and f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)]
-#W = 341, p-value = 3.872e-05
+#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)]
+#W = 0.52384, p-value = 2.028e-08
+
+shapiro.test(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.all2 == TRUE)])
+#
+#       Shapiro-Wilk normality test
+#
+#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.all2 == TRUE)]
+#W = 0.4788, p-value = 2.384e-06
+
+
+shapiro.test(f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.all == TRUE)])
+#
+#       Shapiro-Wilk normality test
+#
+#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.all == TRUE)]
+#W = 0.51958, p-value = 1.256e-08
+
+# test for differences in the distribution of F between groups
+
+# All Contemporary vs Resident CR without E_030
+wilcox.test(x=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)], y=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.all2 == TRUE)], alternative="two.sided")
+#
+#       Wilcoxon rank sum exact test
+#
+#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)] and f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.all2 == TRUE)]
+#W = 312, p-value = 0.008565
 #alternative hypothesis: true location shift is not equal to 0
 
-# Contemporary versus translocated individuals after removing relatedness > 0.4
-wilcox.test(x=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)], y=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)], alternative="two.sided")
+# Contemporary versus all translocated
+wilcox.test(x=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)], y=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.all == TRUE)], alternative="two.sided")
 #
-#	Wilcoxon rank sum exact test
+#       Wilcoxon rank sum exact test
 #
-#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)] and f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)]
-#W = 356, p-value = 9.135e-05
+#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% contemp.all == TRUE)] and f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.all == TRUE)]
+#W = 682, p-value = 3.515e-06
 #alternative hypothesis: true location shift is not equal to 0
 
-# Resident CR versus translocated individuals after removing relatedness > 0.4
-wilcox.test(x=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)], y=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)], alternative="two.sided")
+# All Resident CR without E_030 versus all translocated individuals
+wilcox.test(x=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.all2 == TRUE)], y=f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.all == TRUE)], alternative="two.sided")
 #
-#	Wilcoxon rank sum exact test
+#       Wilcoxon rank sum exact test
 #
-#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.unrelate == TRUE)] and f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.unrelated == TRUE)]
-#W = 96, p-value = 0.7148
+#data:  f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% res.all2 == TRUE)] and f.popaf$F_POP_SPECIFIC_AF[which(f.popaf$ID %in% trans.all == TRUE)]
+#W = 270, p-value = 0.2004
 #alternative hypothesis: true location shift is not equal to 0
 
 --- end R code ---
 
 
-## boxplots comparing individual inbreeding estimated using population-specific allele frequencies
+IVc. Tests with F estimated based on metapopulation allele frequencies estimated without r-pruning. Statistical 
+tests used all individuals (excluding E_030 from the residents due to admixed ancestry).
+
+--- start R code ---
+
+# read in F values calculated using Mosaic-wide allele frequencies (frequencies calculated using all mosaic individuals). These are the values in the 
+# 'F_META_ALL' column of the inbreed_coefficient_alternate_calculations.tsv deposited to dryad.
+f.all <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_formatted.txt', head=TRUE)
+
+# read in relatedness pruned subsets
+res.prune2 <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/unrelated_subsets/resident_cr_noE030_relatedness_maxr0.4_ids_seed836241.txt',head=FALSE)$V1
+trans.prune <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/unrelated_subsets/translocated_relatedness_maxr0.4_ids_seed328974.txt',head=FALSE)$V1
+contemp.prune <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/inputs/contemporary_cr_relatedness_maxr0.4_ids.txt',head=FALSE)$V1 # this is all contemporary individuals because all pairwise r <= 0.4
+
+# test if F is normally distributed
+
+shapiro.test(f.all$F[which(f.all$SAMPLE %in% contemp.prune == TRUE)])
+#
+#       Shapiro-Wilk normality test
+#
+#data:  f.all$F[which(f.all$SAMPLE %in% contemp.prune == TRUE)]
+#W = 0.72967, p-value = 7.7e-06
+
+shapiro.test(f.all$F[which(f.all$SAMPLE %in% res.prune2 == TRUE)])
+#
+#       Shapiro-Wilk normality test
+#
+#data:  f.all$F[which(f.all$SAMPLE %in% res.prune2 == TRUE)]
+#W = 0.57613, p-value = 4.105e-05
+
+shapiro.test(f.all$F[which(f.all$SAMPLE %in% trans.prune == TRUE)])
+#
+#       Shapiro-Wilk normality test
+#
+#data:  f.all$F[which(f.all$SAMPLE %in% trans.prune == TRUE)]
+#W = 0.85767, p-value = 0.02234
+
+# test for differences between distributions of F (with no first degree relatives, all pairwise r < 0.4)
+
+# r-pruned contemporary CR vs resident CR without E_030
+wilcox.test(x=f.all$F[which(f.all$SAMPLE %in% contemp.prune == TRUE)], y=f.all$F[which(f.all$SAMPLE %in% res.prune2 == TRUE)], alternative="two.sided") 
+#
+#       Wilcoxon rank sum exact test
+#
+#data:  f.all$F[which(f.all$SAMPLE %in% contemp.prune == TRUE)] and f.all$F[which(f.all$SAMPLE %in% res.prune2 == TRUE)]
+#W = 278, p-value = 0.006292
+#alternative hypothesis: true location shift is not equal to 0
+
+
+# r-pruned Contemporary versus translocated individuals
+wilcox.test(x=f.all$F[which(f.all$SAMPLE %in% contemp.prune == TRUE)], y=f.all$F[which(f.all$SAMPLE %in% trans.prune == TRUE)], alternative="two.sided")
+#
+#       Wilcoxon rank sum exact test
+#
+#data:  f.all$F[which(f.all$SAMPLE %in% contemp.prune == TRUE)] and f.all$F[which(f.all$SAMPLE %in% trans.prune == TRUE)]
+#W = 306, p-value = 0.01371
+
+# r-pruned Resident CR without E_030 vs translocated individuals
+wilcox.test(x=f.all$F[which(f.all$SAMPLE %in% res.prune2 == TRUE)], y=f.all$F[which(f.all$SAMPLE %in% trans.prune == TRUE)], alternative="two.sided")
+#
+#       Wilcoxon rank sum exact test
+#
+#data:  f.all$F[which(f.all$SAMPLE %in% res.prune2 == TRUE)] and f.all$F[which(f.all$SAMPLE %in% trans.prune == TRUE)]
+#W = 82, p-value = 0.4956
+#alternative hypothesis: true location shift is not equal to 0
+
+# F summary statistics based on subsets of individuals for which all pairwise r < 0.4
+
+# r-pruned Contemporary CR individuals
+mean(f.all$F[which(f.all$SAMPLE %in% contemp.prune == TRUE)])
+#[1] 0.03405179
+sd(f.all$F[which(f.all$SAMPLE %in% contemp.prune == TRUE)])
+#[1] 0.03100887
+range(f.all$F[which(f.all$SAMPLE %in% contemp.prune == TRUE)])
+#[1] 0.006684 0.159594
+
+# r-pruned Resident CR individuals
+mean(f.all$F[which(f.all$SAMPLE %in% res.prune2 == TRUE)])
+#[1] 0.02060154
+sd(f.all$F[which(f.all$SAMPLE %in% res.prune2 == TRUE)])
+#0.03095494
+range(f.all$F[which(f.all$SAMPLE %in% res.prune2 == TRUE)])
+#[1] 0.002205 0.116956
+
+# r-pruned translocated individuals
+mean(f.all$F[which(f.all$SAMPLE %in% trans.prune == TRUE)])
+#[1] 0.0164594
+sd(f.all$F[which(f.all$SAMPLE %in% trans.prune == TRUE)])
+#[1] 0.01255179
+range(f.all$F[which(f.all$SAMPLE %in% trans.prune == TRUE)])
+#[1] 0.00362 0.04953
+
+--- end R code ---
+
+
+V. Boxplots comparing distributions of individuals inbreeding
+
+Va. Boxplots for F estimated based on population-specific allele frequencies estimated using r-pruned subsets of individuals.
+
+F boxplots in Figure 3B. These are the F values in the 'F' field of the M4_sequenced_individual_metadata.tsv file on dryad.
+
+--- start R code ---
+
+library(scales)
+
+# read in data
+
+meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
+
+# set up plotting features
+
+meta$biopoint = biopoint(meta$pop)
+meta$popcol <- popcolor(meta)
+
+meta$group <- replace(meta$pop, which(meta$pop == "Golden_Aster_Scrub" | meta$pop == "Brigman" | meta$pop == "W.Balm" | 
+meta$pop == "Duette_headwaters" | meta$pop == "Sun_City"), "M4")
+
+meta$group <- replace(meta$group, which(meta$group == "SITE_1" | meta$group == "SITE_12" | meta$group == "SITE_13" | 
+meta$group == "SITE_18" | meta$group == "TEXACO"), "Translocated")
+
+meta$group = factor(meta$group, levels=c("Contemporary", "Resident", "Translocated", "M4"))
+
+# omit T_072 (RSW-K) because this site 1 bird was not translocated and migrated to LMSP, which is outside of the Core
+meta.sub <- meta[-which(meta$LAB_ID == "T_072"),]
+
+range(meta$F)
+#[1] 0.000604 0.136676
+
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/F_distribution_pop_specific_AF_fixedMAF_improved_labels.png',width=7, height=7,units='in', res=300)
+h_boxplot3(x=meta.sub, n=21, lev=levels(meta.sub$group), ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=meta.sub$biopoint, seed=1947, color=meta.sub$popcol, 
+ylimits=c(0,0.145), labpos=c(0.8,1.95,3,4))
+axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
+#dev.off()
+
+# make plots with IDs at points to identify particular individuals
+#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/figures/F_distribution_pop_specific_AF_fixedMAF_text.pdf',width=7, height=7)
+h_boxplot3(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.145), idlabels=fdf$ID)
+axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
+
+# zoomed in plot to better distinguish IDs
+h_boxplot3(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.05), idlabels=fdf$ID)
+axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
+
+# zoomed in more
+h_boxplot3(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.008), idlabels=fdf$ID)
+axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
+
+# zoom even more
+h_boxplot3(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.007), idlabels=fdf$ID)
+axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
+
+# highest res zoom
+h_boxplot3(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.003), idlabels=fdf$ID)
+axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
+
+# make a plot to find where the top 5 pedigree-based contributors circled in figure 3A are in the boxplot
+
+meta$maskcol = meta$popcol
+meta$maskcol[-which(meta$LAB_ID == "T_071" | meta$LAB_ID == "T_099" | meta$LAB_ID == "T_081" | meta$LAB_ID == "T_086" | meta$LAB_ID == "T_067")] <- alpha("grey90",0)
+meta$maskcol[which(meta$LAB_ID == "T_071")] <- alpha(meta$popcol[which(meta$LAB_ID == "T_071")],0.65)
+meta$maskcol[which(meta$LAB_ID == "T_099")] <- alpha(meta$popcol[which(meta$LAB_ID == "T_099")],0.65)
+meta$maskcol[which(meta$LAB_ID == "T_081")] <- alpha(meta$popcol[which(meta$LAB_ID == "T_081")],0.65)
+meta$maskcol[which(meta$LAB_ID == "T_086")] <- alpha(meta$popcol[which(meta$LAB_ID == "T_086")],0.65)
+meta$maskcol[which(meta$LAB_ID == "T_067")] <- alpha(meta$popcol[which(meta$LAB_ID == "T_067")],0.65)
+
+#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/figures/F_distribution_pop_specific_AF_fixedMAF_top5ped_contributors_highlight.pdf',width=7, height=7)
+h_boxplot_mask(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=fdf$biopoint, seed=1947, color=meta$maskcol, ylim=c(0,0.145))
+#dev.off()
+
+--- end R code ---
+
+
+Vb. Boxplots for F estimated based on population-specific allele frequencies estimated without r-pruning.
+
+F boxplots in Figure S9 (left panel). These are the F values in the 'F_PS_ALL' field of the inbreed_coefficient_alternate_calculations.tsv file on dryad.
 
 --- start R code ---
 
 library(scales)
 
 meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
-fdf <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_pop_specific_ref_AF_fixedMAF.txt', head=TRUE)
+fdf <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_pop_specific_ref_AF.txt', head=TRUE)
 fdf <- fdf[match(meta$LAB_ID, fdf$ID),] # ensure that the order of individuals matches the metadata
 
-meta$popletter <- popletters(meta)
-meta$popcol <- popcolor(meta)
-meta$colors <- sitecol(meta)
+meta$popletter <- popletters(meta) # popletters function defined in /home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/README_MOSAIC_ANALYSIS
+meta$popcol <- popcolor(meta) # popcolor function defined in /home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/README_MOSAIC_ANALYSIS
+meta$colors <- sitecol(meta) # sitecol function defined in /home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/README_MOSAIC_ANALYSIS
 
 # define groups
 groups <- meta$pop
@@ -2132,81 +2780,33 @@ meta <- meta[-which(meta$LAB_ID == "T_072"),]
 fdf$biopoint = biopoint(meta$pop)
 
 max(fdf$F_POP_SPECIFIC_AF)
-# [1] 0.136676 # set upper y-limit above this value
+# [1] 0.137558 # set upper y-limit above this value
 
 # plot
 
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/F_distribution_pop_specific_AF_fixedMAF.png',width=7, height=7,units='in', res=300)
-h_boxplot2(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=fdf$biopoint, seed=1947, color=meta$popcol, ylim=c(0,0.145))
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/F_distribution_pop_specific_AF.png',width=7, height=7,units='in', res=300) # this is Figure S9 - left panel
+h_boxplot3(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=fdf$biopoint, seed=1947, color=meta$popcol, ylim=c(0,0.145))
 axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
 #dev.off()
-
-# Cut off y-limit at F = 5% to for better resolution of lower F values
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/F_distribution_pop_specific_AF_fixedMAF_ylim_cut.png',width=7, height=7,units='in', res=300)
-h_boxplot2(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=fdf$biopoint, seed=1947, color=meta$popcol, ylim=c(0,0.05))
-axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
-#dev.off()
-
 
 # make plot with IDs at points
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/figures/F_distribution_pop_specific_AF_fixedMAF_text.pdf',width=7, height=7)
-h_boxplot2(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.145), idlabels=fdf$ID)
+#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/figures/F_distribution_pop_specific_AF_text.pdf',width=7, height=7)
+h_boxplot3(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.145), idlabels=fdf$ID)
 axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
 
 # zoomed in plot to better distinguish IDs
-h_boxplot2(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.05), idlabels=fdf$ID)
+h_boxplot3(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.05), idlabels=fdf$ID)
 axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
 
 # zoomed in more
-h_boxplot2(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.008), idlabels=fdf$ID)
+h_boxplot3(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.008), idlabels=fdf$ID)
 axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
 
 # zoom even more
-h_boxplot2(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.007), idlabels=fdf$ID)
+h_boxplot3(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.003), idlabels=fdf$ID)
 axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
 
-# highest resolution zoom
-h_boxplot2(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.003), idlabels=fdf$ID)
-axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
-
-#dev.off()
-
-# make a plot to find where the top five pedigree-based contributors circled in figure 3A are in the boxplot
-
-h_boxplot_mask <- function(x=NULL, n=NULL, lev=grplevels, ylabel="Heterozygosity", pntlab=NULL, seed=10287, color=NULL, ylimits=NULL, idlabels=NULL) {
-        if (length(grep("TeachingDemos",(.packages()))) == 0) library(TeachingDemos) # for shadowtext()
-        nlevel = length(lev)
-
-        par(mar=c(5,5,2,2))
-        boxplot(x[,n] ~ group, data=x, outline=FALSE, names=c(rep("",nlevel)), xlab="", ylab=ylabel, main="", col="gray80", cex.axis=1.5, cex.lab=1.5, lwd=2, ylim=ylimits)
-        #mtext(lev,1,at=1:nlevel, padj=1, cex=1.5)
-        mtext(c(lev[1:3],paste("Other","M4",sep="\n")), 1,at=1:nlevel, padj=1, cex=1.5)
-        #mtext("Group",1,at=3,padj=2.5, cex=1.5)
-
-        # add points
-        for (i in lev) {
-                idx = which(as.character(x$group) == i)
-                set.seed(seed)
-                xjitter = jitter(rep(which(lev == i),length(idx)), amount=0.2)
-                ptcol = NULL
-                for (j in 1:length(idx)) {
-                        if (is.null(color)) ptcol = alpha("maroon",0.5) else ptcol = color[idx[j]]
-                        if (is.null(pntlab) || is.na(pntlab[idx[j]])) {
-                                if (!is.null(idlabels)) {
-                                  text(y=x[idx[j],n], x=xjitter[j],idlabels[idx[j]],cex=0.5,col="red")
-                                } else {
-                                  points(y=x[idx[j],n], x=xjitter[j], pch=1, cex=1.2)
-                                  points(y=x[idx[j],n], x=xjitter[j], pch=16, cex=1.2, col=ptcol)
-                                }
-                        } else if (class(pntlab) == "numeric") {
-                                points(y=x[idx[j],n], x=xjitter[j], pch=pntlab[idx[j]], col=alpha("grey70",0.5), bg=color[idx[j]],lwd=1.3,cex=1.5)
-                        }  else if (class(pntlab) == "character") {
-                                shadowtext(y=x[idx[j],n], x=xjitter[j], labels=pntlab[idx[j]], col=color[idx[j]], bg=alpha("black",0.5), r=0.07, cex=1.2)       
-                        } else stop("Unknown argument to pntlab")
-                }
-        }
-
-}
+# make a plot to find where the top 5 pedigree-based contributors circled in figure 3A are in the boxplot
 
 meta$maskcol = meta$popcol
 meta$maskcol[-which(meta$LAB_ID == "T_071" | meta$LAB_ID == "T_099" | meta$LAB_ID == "T_081" | meta$LAB_ID == "T_086" | meta$LAB_ID == "T_067")] <- alpha("grey90",0)
@@ -2216,11 +2816,64 @@ meta$maskcol[which(meta$LAB_ID == "T_081")] <- alpha(meta$popcol[which(meta$LAB_
 meta$maskcol[which(meta$LAB_ID == "T_086")] <- alpha(meta$popcol[which(meta$LAB_ID == "T_086")],0.65)
 meta$maskcol[which(meta$LAB_ID == "T_067")] <- alpha(meta$popcol[which(meta$LAB_ID == "T_067")],0.65)
 
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/figures/F_distribution_pop_specific_AF_fixedMAF_top5ped_contributors_highlight.pdf',width=7, height=7)
 h_boxplot_mask(x=fdf, n=7, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=fdf$biopoint, seed=1947, color=meta$maskcol, ylim=c(0,0.145))
+
+--- end R code ---
+
+
+Vc. Boxplots for F estimated based on metapopulation allele frequencies estimated without r-pruning.
+
+F boxplots in Figure S9 (right panel). These are the F values in the 'F_META_ALL' field of the inbreed_coefficient_alternate_calculations.tsv file on dryad.
+
+--- start R code ---
+
+library(scales) # for alpha
+
+# read in metapop data
+meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
+meta$popletter <- popletters(meta)
+meta$popcol <- popcolor(meta)
+
+# define groups
+groups <- meta$pop
+grplevels <- c("Contemporary", "Resident", "Translocated", "M4")
+
+groups <- replace(groups, which(groups == "Golden_Aster_Scrub" | groups == "Brigman" | groups == "W.Balm" | 
+groups == "Duette_headwaters" | groups == "Sun_City"), "M4")
+
+groups <- replace(groups, which(groups == "SITE_1" | groups == "SITE_12" | groups == "SITE_13" | 
+groups == "SITE_18" | groups == "TEXACO"), "Translocated")
+
+# read in F (inbreeding coefficient)
+fcoef <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F.txt',head=FALSE) # F estimated using metapopulation allele frequencies
+fcoef$group = factor(groups,levels=grplevels)
+fcoef$SAMPLE = meta$LAB_ID
+
+# omit T_072 (RSW-K) because this site 1 bird was not translocated and migrated to LMSP, which is outside of the Core
+fcoef <- fcoef[-which(fcoef$SAMPLE == "T_072"),]
+meta <- meta[-which(meta$LAB_ID == "T_072"),]
+
+# set point type
+fcoef$biopoint = biopoint(meta$pop)
+
+range(fcoef$V1)
+#[1] 0.001959 0.159594
+
+# plot
+
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/F_distribution.png',width=7, height=7,units='in', res=300)
+h_boxplot3(x=fcoef, n=1, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F))), pntlab=fcoef$biopoint, seed=1947, color=meta$popcol, ylimits=c(0,0.17))
+axis(2, at=c((0.0+0.05)/2, (0.05+0.1)/2, (0.1+0.15)/2), line=NA, labels=NA) # add some extra axis tick marks for clarity
+#dev.off()
+
+# make version with text IDs to identify particular individuals
+
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/F_distribution_text.png',width=7, height=7,units='in', res=300)
+h_boxplot3(x=fcoef, n=1, lev=grplevels, ylabel="Inbreeding coefficient (F)", pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.17), idlabels=fcoef$SAMPLE)
 #dev.off()
 
 --- end R code ---
+
 
 #
 #
@@ -2234,7 +2887,7 @@ Identify runs of homozygosity with bcftools roh HMM.
 ## Define reference populations and calculate allele frequencies
 
 Reference population allele frequencies estimated for groups with >= 10 individuals after pruning potential 
-first degree relatives (r > 0.4).
+first degree relatives (ensure all pairwise r < 0.4).
 
 
 --- start R code ---
@@ -2285,6 +2938,8 @@ $ /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/scripts/subsetUnrela
 $ /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/scripts/subsetUnrelated.R cr_founders_relatedness_matrix.txt 0.4 836241 > cr_founders_relatedness_maxr0.4_ids.txt
 $ /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/scripts/subsetUnrelated.R donor_pops_relatedness_matrix.txt 0.4 836241 > donor_pops_relatedness_maxr0.4_ids.txt
 $ /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/scripts/subsetUnrelated.R fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_matrix_fmt.txt 0.4 836241 > fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_maxr0.4_ids.txt
+
+The ID lists above were used to construct BAM lists containing the corresponding individuals, which was used as input to estimate allele frequencies for different groups.
 
 Identify sites segregating within subsetted reference groups.
 
@@ -2358,6 +3013,8 @@ $ tabix -s1 -b2 -e2 historic_metapop_maxr0.4_biallelic_snps_main_autosomes_qc.af
 
 $ zcat mosaic_all_maxr0.4_biallelic_snps_main_autosomes_qc.mafs.gz | tail -n+2 | perl -ne 'chomp; @tok=split(/\t/,$_); print "$tok[0]\t$tok[1]\t$tok[2],$tok[3]\t$tok[4]\n";' | bgzip -c > mosaic_all_maxr0.4_biallelic_snps_main_autosomes_qc.af.gz
 $ tabix -s1 -b2 -e2 mosaic_all_maxr0.4_biallelic_snps_main_autosomes_qc.af.gz
+
+Note that allele frequencies in mosaic_all_maxr0.4_biallelic_snps_main_autosomes_qc.mafs.gz are estimated from the individuals in fsj_mosaic_biallelic_snps_main_autosomes_qc_relatedness_maxr0.4_ids.txt.
 
 ## Identify ROH
 
@@ -2630,11 +3287,10 @@ done < /mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs/mosaic_all_ids.t
 
 Combine high quality FROH estimates across all samples into a single file.
 
-'FROH_BEST' (what I consider the best Froh estimate) is 
-Froh estimated using population-specific allele frequencies (when they could be estimated with a sample size >= 10 after removing 
-first degree relatives, r > 0.4) when possible. When estimating population-specific allele frequencies was not possible the next 
-most appropriate reference population was chosen, specifically the pooled donor sites for translocated jays or the entire historic metapopulation 
-for the 'other' M4 population individuals.
+'FROH_BEST' (what I consider the best Froh estimate) is Froh estimated using population-specific allele frequencies (when they could be estimated 
+with a sample size >= 10 after removing first degree relatives, r > 0.4) when possible. When estimating population-specific allele frequencies 
+was not possible the next most appropriate reference population was chosen, specifically the pooled donor sites for translocated jays or the entire 
+historic metapopulation for the 'other' M4 population individuals. The 'FROH_BEST' estimates were added to the metadata, /home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt, and the M4_sequenced_individual_metadata.tsv file deposited to dryad under the 'FROH' field.
 
 --- start R code ---
 
@@ -2684,169 +3340,914 @@ allcomb <- allcomb[,c(1,8,3:7,2)]
 
 --- end R code ---
 
-## Statistical tests comparing FROH distributions betwen groups
+## Statistical tests comparing FROH distributions between groups
 
-Froh tests for the paper used only the subsets of individuals for which all pairwise relatedness was below 0.4.
+Test for differences in the distribution of Froh between subsets of individuals for which all pairwise r is below 0.4.
 
 --- start R code ---
 
 fdf <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/estimates/froh/mosaic_collated_froh.txt',head=TRUE)
 
-contemp.unrelate <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs/contemporary_cr_relatedness_maxr0.4_ids.txt',head=FALSE)$V1 # this is the same as all conetmporary individuals because none had r > 0.4
-res.unrelate <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs/resident_cr_relatedness_maxr0.4_ids.txt',head=FALSE)$V1
-res.all <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs/resident_cr_ids.txt',head=FALSE)$V1
-donors.all <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs/donor_pops_ids.txt',head=FALSE)$V1
-trans.all <- donors.all[-which(donors.all == "T_072")] # all translocated individuals
-donors.unrelated <- read.table('/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs/donor_pops_relatedness_maxr0.4_ids.txt',head=FALSE)$V1
-trans.unrelated <- donors.unrelated[-which(donors.unrelated == "T_072")] # translocated individuals with no first degree relatives
+# read in relatedness pruned subsets
+res.prune <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/inputs/resident_cr_relatedness_maxr0.4_ids.txt',head=FALSE)$V1
+res.prune2 <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/unrelated_subsets/resident_cr_noE030_relatedness_maxr0.4_ids_seed836241.txt',head=FALSE)$V1
+trans.prune <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/unrelated_subsets/translocated_relatedness_maxr0.4_ids_seed328974.txt',head=FALSE)$V1 # updated compared to /mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs/donor_pops_relatedness_maxr0.4_ids.txt subset to strictly translocated jays and not those considered translocated (i.e. I_049)
+contemp.prune <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/inputs/contemporary_cr_relatedness_maxr0.4_ids.txt',head=FALSE)$V1 # these are all contemporary individuals because all pairwise r was < 0.4
 
-## froh are not normally distributed
+## Test whether Froh are normally distributed
 
-shapiro.test(fdf$FROH_BEST[which(fdf$ID %in% contemp.unrelate == TRUE)])
+# r-pruned contemporary
+shapiro.test(meta$FROH[which(meta$LAB_ID %in% contemp.prune == TRUE)])
 #
-#	Shapiro-Wilk normality test
+#       Shapiro-Wilk normality test
 #
-#data:  fdf$FROH_BEST[which(fdf$ID %in% contemp.unrelate == TRUE)]
+#data:  meta$FROH[which(meta$LAB_ID %in% contemp.prune == TRUE)]
 #W = 0.8966, p-value = 0.009531
 
-shapiro.test(fdf$FROH_BEST[which(fdf$ID %in% res.unrelate == TRUE)])
+# r-pruned residents without E_030
+shapiro.test(meta$FROH[which(meta$LAB_ID %in% res.prune2 == TRUE)])
 #
-#	Shapiro-Wilk normality test
+#       Shapiro-Wilk normality test
 #
-#data:  fdf$FROH_BEST[which(fdf$ID %in% res.unrelate == TRUE)]
-#W = 0.69944, p-value = 0.0003645
+#data:  meta$FROH[which(meta$LAB_ID %in% res.prune2 == TRUE)]
+#W = 0.69005, p-value = 0.0004421
 
-shapiro.test(fdf$FROH_BEST[which(fdf$ID %in% trans.unrelated == TRUE)])
+# r-pruned translocated
+shapiro.test(meta$FROH[which(meta$LAB_ID %in% trans.prune == TRUE)])
 #
-#	Shapiro-Wilk normality test
+#       Shapiro-Wilk normality test
 #
-#data:  fdf$FROH_BEST[which(fdf$ID %in% trans.unrelated == TRUE)]
-#W = 0.75867, p-value = 0.001137
+#data:  meta$FROH[which(meta$LAB_ID %in% trans.prune == TRUE)]
+#W = 0.94394, p-value = 0.4345
 
 
-## test for differences in the distributions of froh
+## test for differences in the distributions of Froh
 
-# contemporary versus resident CR indivdiuals after removing first degree relatives (r > 0.4)
-wilcox.test(x=fdf$FROH_BEST[which(fdf$ID %in% contemp.unrelate == TRUE)], y=fdf$FROH_BEST[which(fdf$ID %in% res.unrelate == TRUE)], alternative="two.sided")
+# r-pruned contemporary vs resident without E_030
+c_v_r2_prune <- wilcox.test(x=meta$FROH[which(meta$LAB_ID %in% contemp.prune == TRUE)], y=meta$FROH[which(meta$LAB_ID %in% res.prune2 == TRUE)], alternative="two.sided")
+c_v_r2_prune
 #
-#	Wilcoxon rank sum exact test
+#       Wilcoxon rank sum exact test
 #
-#data:  fdf$FROH_BEST[which(fdf$ID %in% contemp.unrelate == TRUE)] and fdf$FROH_BEST[which(fdf$ID %in% res.unrelate == TRUE)]
-#W = 273, p-value = 0.04018
+#data:  meta$FROH[which(meta$LAB_ID %in% contemp.prune == TRUE)] and meta$FROH[which(meta$LAB_ID %in% res.prune2 == TRUE)]
+#W = 248, p-value = 0.06602
 #alternative hypothesis: true location shift is not equal to 0
 
-# Contemporary CR versus translocated individuals after removing first degree relatives (r > 0.4)
-wilcox.test(x=fdf$FROH_BEST[which(fdf$ID %in% contemp.unrelate == TRUE)], y=fdf$FROH_BEST[which(fdf$ID %in% trans.unrelated == TRUE)], alternative="two.sided")
+# r-pruned contemporary vs translocated
+c_v_t_prune <- wilcox.test(x=meta$FROH[which(meta$LAB_ID %in% contemp.prune == TRUE)], y=meta$FROH[which(meta$LAB_ID %in% trans.prune == TRUE)], alternative="two.sided")
+c_v_t_prune
 #
-#	Wilcoxon rank sum exact test
+#       Wilcoxon rank sum exact test
 #
-#data:  fdf$FROH_BEST[which(fdf$ID %in% contemp.unrelate == TRUE)] and fdf$FROH_BEST[which(fdf$ID %in% trans.unrelated == TRUE)]
-#W = 283, p-value = 0.06421
+#data:  meta$FROH[which(meta$LAB_ID %in% contemp.prune == TRUE)] and meta$FROH[which(meta$LAB_ID %in% trans.prune == TRUE)]
+#W = 323, p-value = 0.003333
 #alternative hypothesis: true location shift is not equal to 0
 
-# resident CR versus translocated individuals after removing first degree relatives (r > 0.4)
-wilcox.test(x=fdf$FROH_BEST[which(fdf$ID %in% res.unrelate == TRUE)], y=fdf$FROH_BEST[which(fdf$ID %in% trans.unrelated == TRUE)], alternative="two.sided")
+# r-pruned residents without E_030 vs translocated
+r2_v_t_prune <- wilcox.test(x=meta$FROH[which(meta$LAB_ID %in% res.prune2 == TRUE)], y=meta$FROH[which(meta$LAB_ID %in% trans.prune == TRUE)], alternative="two.sided")
+r2_v_t_prune
 #
-#	Wilcoxon rank sum exact test
+#       Wilcoxon rank sum exact test
 #
-#data:  fdf$FROH_BEST[which(fdf$ID %in% res.unrelate == TRUE)] and fdf$FROH_BEST[which(fdf$ID %in% trans.unrelated == TRUE)]
-#W = 99, p-value = 0.8132
+#data:  meta$FROH[which(meta$LAB_ID %in% res.prune2 == TRUE)] and meta$FROH[which(meta$LAB_ID %in% trans.prune == TRUE)]
+#W = 117, p-value = 0.3874
 #alternative hypothesis: true location shift is not equal to 0
 
-## Calculate Froh summary stats for groups of individuals
+## Calculate Froh summary stats for groups of individuals for which r < 0.4
 
-# All (same as subset with r <= 0.4) Contemporary CR
-mean(fdf$FROH_BEST[which(fdf$ID %in% contemp.unrelate == TRUE)])
+# r-pruned contemporary
+mean(meta$FROH[which(meta$LAB_ID %in% contemp.prune == TRUE)])
 #[1] 0.09776112
-sd(fdf$FROH_BEST[which(fdf$ID %in% contemp.unrelate == TRUE)])
+sd(meta$FROH[which(meta$LAB_ID %in% contemp.prune == TRUE)])
 #[1] 0.04031343
-range(fdf$FROH_BEST[which(fdf$ID %in% contemp.unrelate == TRUE)])
+range(meta$FROH[which(meta$LAB_ID %in% contemp.prune == TRUE)])
 #[1] 0.04617017 0.23007078
 
-# Resident CR subset with r <= 0.4
-mean(fdf$FROH_BEST[which(fdf$ID %in% res.unrelate == TRUE)])
-#[1] 0.08342186
-sd(fdf$FROH_BEST[which(fdf$ID %in% res.unrelate == TRUE)])
-#[1] 0.05677626
-range(fdf$FROH_BEST[which(fdf$ID %in% res.unrelate == TRUE)])
-#[1] 0.0386152 0.2439435
+# r-pruned residents without E_030
+mean(meta$FROH[which(meta$LAB_ID %in% res.prune2 == TRUE)])
+#[1] 0.0849069
+sd(meta$FROH[which(meta$LAB_ID %in% res.prune2 == TRUE)])
+#[1] 0.05476314
+range(meta$FROH[which(meta$LAB_ID %in% res.prune2 == TRUE)])
+#[1] 0.04494418 0.24394346
 
-# All resident CR
-mean(fdf$FROH_BEST[which(fdf$ID %in% res.all == TRUE)])
-#[1] 0.08915113
-sd(fdf$FROH_BEST[which(fdf$ID %in% res.all == TRUE)])
-#[1] 0.05549573
-range(fdf$FROH_BEST[which(fdf$ID %in% res.all == TRUE)])
-#[1] 0.0386152 0.2439435
-
-# Translocated subset with r <= 0.4
-mean(fdf$FROH_BEST[which(fdf$ID %in% trans.unrelated == TRUE)])
-#[1] 0.08030449
-sd(fdf$FROH_BEST[which(fdf$ID %in% trans.unrelated == TRUE)])
-#[1] 0.0413815
-range(fdf$FROH_BEST[which(fdf$ID %in% trans.unrelated == TRUE)])
-#[1] 0.04389309 0.20818305
-
-# All translocated
-mean(fdf$FROH_BEST[which(fdf$ID %in% trans.all == TRUE)])
-#[1] 0.07140679
-sd(fdf$FROH_BEST[which(fdf$ID %in% trans.all == TRUE)])
-#[1] 0.03424103
-range(fdf$FROH_BEST[which(fdf$ID %in% trans.all == TRUE)])
-#[1] 0.03469923 0.20818305
+# r-pruned translocated
+mean(meta$FROH[which(meta$LAB_ID %in% trans.prune == TRUE)])
+#[1] 0.06572061
+sd(meta$FROH[which(meta$LAB_ID %in% trans.prune == TRUE)])
+#[1] 0.02245787
+range(meta$FROH[which(meta$LAB_ID %in% trans.prune == TRUE)])
+#[1] 0.03469923 0.11252995
 
 --- end R code ---
 
-## Froh boxplots - Figure S2
+## Froh boxplots (Figure S6)
+
+The inbreeding estimates being plotted are Froh estimated using population-specific allele frequencies estimated on subsets of indivdiuals 
+for which pairwise r was below 0.4.
 
 --- start R code ---
 
 library(scales)
 
+# parse data
 meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE,sep="\t")
-frohdf <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/estimate/froh/mosaic_collated_froh.txt',head=TRUE)
 
-frohdf <- frohdf[match(meta$LAB_ID, frohdf$ID),] # ensure that the order of individuals matches the metadata
-
-meta$popletter <- popletters(meta)
+meta$biopoint = biopoint(meta$pop)
 meta$popcol <- popcolor(meta)
-meta$colors <- sitecol(meta)
 
-# define groups
-groups <- meta$pop
-grplevels <- c("Contemporary", "Resident", "Translocated", "M4")
+meta$group <- replace(meta$pop, which(meta$pop == "Golden_Aster_Scrub" | meta$pop == "Brigman" | meta$pop == "W.Balm" |
+meta$pop == "Duette_headwaters" | meta$pop == "Sun_City"), "M4")
 
-groups <- replace(groups, which(groups == "Golden_Aster_Scrub" | groups == "Brigman" | groups == "W.Balm" | 
-groups == "Duette_headwaters" | groups == "Sun_City"), "M4")
+meta$group <- replace(meta$group, which(meta$group == "SITE_1" | meta$group == "SITE_12" | meta$group == "SITE_13" |
+meta$group == "SITE_18" | meta$group == "TEXACO"), "Translocated")
 
-groups <- replace(groups, which(groups == "SITE_1" | groups == "SITE_12" | groups == "SITE_13" | 
-groups == "SITE_18" | groups == "TEXACO"), "Translocated")
+meta$group = factor(meta$group, levels=c("Contemporary", "Resident", "Translocated", "M4"))
 
-frohdf$group = factor(groups,levels=grplevels)
+meta.sub <- meta[-which(meta$LAB_ID == "T_072"),]
 
-# omit T_072 (RSW-K) because this site 1 bird was not translocated and migrated to LMSP, which is outside of the Core
-frohdf <- frohdf[-which(frohdf$ID == "T_072"),]
-meta <- meta[-which(meta$LAB_ID == "T_072"),]
+range(meta.sub$FROH)
+#[1] 0.03469923 0.24783084
 
-# set point type
-frohdf$biopoint = biopoint(meta$pop)
-
-max(frohdf$FROH_BEST)
-#[1] 0.2478308 # max Froh - set y-limit above this
-
-# plot
-
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/Froh_distribution_pop_specific_AF.png',width=7, height=7,units='in', res=300)
-h_boxplot2(x=frohdf, n=2, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F[roh]))), pntlab=frohdf$biopoint, seed=1947, color=meta$popcol, ylim=c(0,0.26))
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/Froh_distribution_pop_specific_AF_improved_labels.png',width=7, height=7,units='in', res=300)
+h_boxplot3(x=meta.sub, n=22, lev=levels(meta.sub$group), ylabel=expression(Individual~inbreeding~(italic(F[ROH]))), pntlab=meta.sub$biopoint, seed=1947, color=meta.sub$popcol, ylim=c(0,0.28),
+labpos=c(0.8,1.95,3,4))
 #dev.off()
 
-# make plot with IDs as points
-#pdf(file='/home/tyler/Dropbox/research/jay/mosaic/figures/Froh_distribution_pop_specific_AF_text.pdf',width=7, height=7)
-h_boxplot2(x=frohdf, n=2, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F[roh]))), pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.26), idlabels=frohdf$ID)
+--- end R code ---
 
-# zoom in to better distinguish IDs
-h_boxplot2(x=frohdf, n=2, lev=grplevels, ylabel=expression(Individual~inbreeding~(italic(F[roh]))), pntlab=NULL, seed=1947, color=meta$popcol, ylimits=c(0,0.15), idlabels=frohdf$ID)
 
+#
+#
+#
+
+## ---------- RELATIONSHIP BETWEEN SEQUENCING DEPTH AND INBREEDING ---------- ##
+
+Test for effects of sequencing depth on estimates of F from ngsF and runs of homozygosity. 
+Also make plots of inbreeding estimates against sequencing depth.
+
+--- start R code ---
+
+library(scales)
+library(boot)
+
+meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE)
+colnames(meta)[which(colnames(meta) == "pop_name_full")] = "POPULATION" # this is just to make column names consistent with the M4_sequenced_individual_metadata.tsv file on dryad
+biotype_col = bioclass_col(meta$POPULATION)
+meta$ptype = biopoint(meta$pop)
+meta$popcol = popcolor(meta)
+
+froh <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/estimate/froh/mosaic_collated_froh.txt',head=TRUE) # Froh estimated using population-specific ('FROH_BEST') and metapopulation allele frequencies ('FROH_ALL_MOSAIC_AF') estimated from r-pruned subsets of individuals (all pairwise r <= 0.4)
+ngsf.all <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_formatted.txt',head=TRUE) # ngsF F estimated based on all individuals (no r-pruning) and metapopulation-wide reference population
+ngsf.ps <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_pop_specific_ref_AF_fixedMAF.txt', head=TRUE) # ngsF F estimated using population-specific allele frequencies from r-pruned subsets (all pairwise r <= 0.4)
+ngsf.ps2 <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_pop_specific_ref_AF.txt',head=TRUE) # ngsF F estimated using population-specific allele frequencies without relatedness pruning
+
+# collate F and depth
+meta$F_ALL = sapply(meta$LAB_ID,function(x,df){df$F[which(df$SAMPLE == x)]},df=ngsf.all, USE.NAMES=FALSE)
+meta$F_PS = sapply(meta$LAB_ID,function(x,df){df$F_POP_SPECIFIC_AF[which(df$ID == x)]},df=ngsf.ps, USE.NAMES=FALSE)
+meta$F_PS2 = sapply(meta$LAB_ID,function(x,df){df$F_POP_SPECIFIC_AF[which(df$ID == x)]},df=ngsf.ps2, USE.NAMES=FALSE)
+meta$FROH_ALL = sapply(meta$LAB_ID,function(x,df){df$FROH_ALL_MOSAIC_AF[which(df$ID == x)]},df=froh, USE.NAMES=FALSE)
+meta$FROH_PS = sapply(meta$LAB_ID,function(x,df){df$FROH_BEST[which(df$ID == x)]},df=froh, USE.NAMES=FALSE)
+
+#I. Test for relationships between sequencing depth and F estimated from population-specific allele frequencies from r-pruned 
+#subsets of individuals ('F' in dryad M4_sequenced_individual_metadata.tsv file).
+
+ngsf_f_depth_ps_model = lm(F_PS ~ autosome_depth, data=meta)
+
+summary(ngsf_f_depth_ps_model)
+#
+#Call:
+#lm(formula = F_PS ~ autosome_depth, data = meta)
+#
+#Residuals:
+#      Min        1Q    Median        3Q       Max 
+#-0.012577 -0.009111 -0.006283 -0.004268  0.124075 
+#
+#Coefficients:
+#                Estimate Std. Error t value Pr(>|t|)
+#(Intercept)    0.0085178  0.0171284   0.497    0.620
+#autosome_depth 0.0004936  0.0023286   0.212    0.833
+#
+#Residual standard error: 0.02217 on 85 degrees of freedom
+#Multiple R-squared:  0.0005284,        Adjusted R-squared:  -0.01123 
+#F-statistic: 0.04494 on 1 and 85 DF,  p-value: 0.8326
+
+shapiro.test(resid(ngsf_f_depth_ps_model)) # errors not normal so will use a bootstrap to test for significant effect of depth on F
+#
+#       Shapiro-Wilk normality test
+#
+#data:  resid(ngsf_f_depth_ps_model)
+#W = 0.48763, p-value = 6.784e-16
+
+ngsf_f_depth.boot <- boot(data.frame(x=meta$autosome_depth, y=meta$F_PS), getBeta1, R=10000, stype="i", sim="ordinary")
+ngsf_f_depth.ci <- boot.ci(ngsf_f_depth.boot, conf=0.95, type=c("perc","bca"))
+
+ngsf_f_depth.ci
+#BOOTSTRAP CONFIDENCE INTERVAL CALCULATIONS
+#Based on 10000 bootstrap replicates
+#
+#CALL : 
+#boot.ci(boot.out = ngsf_f_depth.boot, conf = 0.95, type = c("perc", 
+#    "bca"))
+#
+#Intervals : 
+#Level     Percentile            BCa          
+#95%   (-0.0041,  0.0067 )   (-0.0034,  0.0086 )  
+#Calculations and Intervals on Original Scale
+
+# plot F vs depth (Figures S7A and S7B)
+
+#png(file="/home/tyler/Dropbox/research/jay/mosaic/figures/methods_evaluation/ngsF_F_vs_depth_pop_specific.png", width=7, height=7, units='in', res=300)
+par(mgp=c(2.65,1,0), mar=c(5,4.3,4,2) + 0.1)
+plot(x = meta$autosome_depth, y = meta$F_PS, cex=1.5, pch=21, col=biotype_col, bg=alpha(biotype_col,0.6), xlab="Average sequencing depth",
+ylab=bquote(italic(F[ngsF])),cex.lab=1.5, cex.axis=1.5, main="Population-specific AF")
+abline(a=ngsf_f_depth_ps_model$coefficients[1], b=ngsf_f_depth_ps_model$coefficients[2], col="gray40")
+legend('topright',legend=c("Contemporary CR","Resident CR","Donor population","Other M4"), fill=c("hotpink2","purple2","dodgerblue2","gold2"),bty='n',cex=1.2)
+text(x=11,y=0.02,label=bquote(italic(r)^2 == .(round(summary(ngsf_f_depth_ps_model)$r.square, digits=5))), cex=1.3)
+#dev.off()
+
+# y-limit zoom
+#png(file="/home/tyler/Dropbox/research/jay/mosaic/figures/methods_evaluation/ngsF_F_vs_depth_pop_specific_yzoom.png", width=7, height=7, units='in', res=300)
+par(mgp=c(2.65,1,0), mar=c(5,4.3,4,2) + 0.1)
+plot(x = meta$autosome_depth, y = meta$F_PS, cex=1.5, pch=21, col=biotype_col, bg=alpha(biotype_col,0.6), xlab="Average sequencing depth",
+ylab=bquote(italic(F[ngsF])),cex.lab=1.5, cex.axis=1.5, main="Population-specific AF", ylim=c(0,0.02))
+legend('topright',legend=c("Contemporary CR","Resident CR","Donor population","Other M4"), fill=c("hotpink2","purple2","dodgerblue2","gold2"),bty='n',cex=1.2)
+#dev.off()
+
+#II. Test for relationships between sequencing depth and F estimated from metapopulation allele frequencies with no r-pruning 
+# ('F_META_ALL' in dryad inbreed_coefficient_alternate_calculations.tsv file). 
+
+ngsf_f_depth_model = lm(F_ALL ~ autosome_depth, data=meta)
+
+summary(ngsf_f_depth_model)
+#
+#Call:
+#lm(formula = F_ALL ~ autosome_depth, data = meta)
+#
+#Residuals:
+#      Min        1Q    Median        3Q       Max 
+#-0.023402 -0.017828 -0.009750  0.005047  0.133679 
+#
+#Coefficients:
+#                Estimate Std. Error t value Pr(>|t|)
+#(Intercept)    0.0234328  0.0221008    1.06    0.292
+#autosome_depth 0.0003001  0.0030045    0.10    0.921
+#
+#Residual standard error: 0.02861 on 85 degrees of freedom
+#Multiple R-squared:  0.0001174,        Adjusted R-squared:  -0.01165 
+#F-statistic: 0.009978 on 1 and 85 DF,  p-value: 0.9207
+
+shapiro.test(resid(ngsf_f_depth_model)) # errors not normal so will use a bootstrap to test effect of depth on F
+#
+#       Shapiro-Wilk normality test
+#
+#data:  resid(ngsf_f_depth_model)
+#W = 0.71935, p-value = 1.33e-11
+
+
+ngsf_f_depth_meta.boot <- boot(data.frame(x=meta$autosome_depth, y=meta$F_ALL), getBeta1, R=10000, stype="i", sim="ordinary")
+ngsf_f_depth_meta.ci <- boot.ci(ngsf_f_depth_meta.boot, conf=0.95, type=c("perc","bca"))
+
+ngsf_f_depth_meta.ci
+#BOOTSTRAP CONFIDENCE INTERVAL CALCULATIONS
+#Based on 10000 bootstrap replicates
+#
+#CALL : 
+#boot.ci(boot.out = ngsf_f_depth_meta.boot, conf = 0.95, type = c("perc", 
+#    "bca"))
+#
+#Intervals : 
+#Level     Percentile            BCa          
+#95%   (-0.0050,  0.0069 )   (-0.0043,  0.0082 )  
+#Calculations and Intervals on Original Scale
+
+# plot F versus depth
+
+#png(file="/home/tyler/Dropbox/research/jay/mosaic/figures/methods_evaluation/ngsF_F_vs_depth_metapop_wide.png")
+par(mgp=c(2.65,1,0), mar=c(5,4.3,4,2) + 0.1)
+plot(x = meta$autosome_depth, y = meta$F_ALL, cex=1.5, pch=21, col=biotype_col, bg=alpha(biotype_col,0.6), xlab="Average sequencing depth",
+ylab=bquote(italic(F[ngsF])),cex.lab=1.5, cex.axis=1.5, main="Metapopulation-wide AF")
+abline(a=ngsf_f_depth_model$coefficients[1], b=ngsf_f_depth_model$coefficients[2], col="gray40")
+legend('topright',legend=c("Contemporary CR","Resident CR","Donor population","Other M4"), fill=c("hotpink2","purple2","dodgerblue2","gold2"),bty='n',cex=1.2)
+text(x=11.4,y=0.0335,label=bquote(italic(r)^2 == .(round(summary(ngsf_f_depth_model)$r.square, digits=5))), cex=1.3)
+#dev.off()
+
+#III. Test for relationships between sequencing depth and Froh estimated with population-specific allele frequencies from r-pruned 
+#subsets of individuals ('FROH' in dryad M4_sequenced_individual_metadata.tsv file).
+
+froh_depth_ps_model = lm(FROH_PS ~ autosome_depth, data=meta)
+
+summary(froh_depth_ps_model)
+#
+#Call:
+#lm(formula = FROH_PS ~ autosome_depth, data = meta)
+#
+#Residuals:
+#     Min       1Q   Median       3Q      Max 
+#-0.05367 -0.03005 -0.01158  0.01699  0.15842 
+#
+#Coefficients:
+#                Estimate Std. Error t value Pr(>|t|)   
+#(Intercept)     0.103826   0.035624   2.915  0.00455 **
+#autosome_depth -0.002310   0.004843  -0.477  0.63465   
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+#
+#Residual standard error: 0.04612 on 85 degrees of freedom
+#Multiple R-squared:  0.002669, Adjusted R-squared:  -0.009065 
+#F-statistic: 0.2274 on 1 and 85 DF,  p-value: 0.6347
+
+shapiro.test(resid(froh_depth_ps_model)) # errors not normal so will use a bootstrap to test effect depth on Froh
+#
+#       Shapiro-Wilk normality test
+#
+#data:  resid(froh_depth_ps_model)
+#W = 0.83515, p-value = 1.976e-08
+
+froh_depth_ps.boot <- boot(data.frame(x=meta$autosome_depth, y=meta$FROH_PS), getBeta1, R=10000, stype="i", sim="ordinary")
+froh_depth_ps.ci <- boot.ci(froh_depth_ps.boot, conf=0.95, type=c("perc","bca"))
+
+froh_depth_ps.ci
+#BOOTSTRAP CONFIDENCE INTERVAL CALCULATIONS
+#Based on 10000 bootstrap replicates
+#
+#CALL : 
+#boot.ci(boot.out = froh_depth_ps.boot, conf = 0.95, type = c("perc", 
+#    "bca"))
+#
+#Intervals : 
+#Level     Percentile            BCa          
+#95%   (-0.0114,  0.0060 )   (-0.0112,  0.0062 )  
+#Calculations and Intervals on Original Scale
+
+# plot Froh vs sequence depth (Figure S7C)
+
+#png(file="/home/tyler/Dropbox/research/jay/mosaic/figures/methods_evaluation/Froh_vs_depth_pop_specific.png", width=7, height=7, units='in', res=300)
+par(mgp=c(2.65,1,0), mar=c(5,4.3,4,2) + 0.1)
+plot(x = meta$autosome_depth, y = meta$FROH_PS, cex=1.5, pch=21, col=biotype_col, bg=alpha(biotype_col,0.6), xlab="Average sequencing depth",
+ylab=bquote(italic(F[ROH])),cex.lab=1.5, cex.axis=1.5, main="Population-specific AF")
+abline(a=froh_depth_ps_model$coefficients[1], b=froh_depth_ps_model$coefficients[2], col="gray40")
+legend('topright',legend=c("Contemporary CR","Resident CR","Donor population","Other M4"), fill=c("hotpink2","purple2","dodgerblue2","gold2"),bty='n',cex=1.2)
+text(x=11.3,y=0.07,label=bquote(italic(r)^2 == .(round(summary(froh_depth_ps_model)$r.square, digits=5))), cex=1.3)
+#dev.off()
+
+#IV. Test for relationships between sequencing depth and Froh estimated with metapopulation-wide allele frequencies from r-pruned 
+#subsets of individuals ('FROH_META_PRUNE' in dryad inbreed_coefficient_alternate_calculations.tsv file).
+
+froh_depth_model = lm(FROH_ALL ~ autosome_depth, data=meta)
+
+summary(froh_depth_model)
+#
+#Call:
+#lm(formula = FROH_ALL ~ autosome_depth, data = meta)
+#
+#Residuals:
+#     Min       1Q   Median       3Q      Max 
+#-0.05721 -0.03046 -0.01250  0.01395  0.15706 
+#
+#Coefficients:
+#                Estimate Std. Error t value Pr(>|t|)   
+#(Intercept)     0.105613   0.035844   2.946  0.00415 **
+#autosome_depth -0.002034   0.004873  -0.417  0.67746   
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+#
+#Residual standard error: 0.0464 on 85 degrees of freedom
+#Multiple R-squared:  0.002045, Adjusted R-squared:  -0.009695 
+#F-statistic: 0.1742 on 1 and 85 DF,  p-value: 0.6775
+
+shapiro.test(resid(froh_depth_model)) # errors not normal so will use a bootstrap to test effect of depth on Froh
+#
+#       Shapiro-Wilk normality test
+#
+#data:  resid(froh_depth_model)
+#W = 0.84653, p-value = 4.765e-08
+
+froh_depth.boot <- boot(data.frame(x=meta$autosome_depth, y=meta$FROH_ALL), getBeta1, R=10000, stype="i", sim="ordinary")
+froh_depth.ci <- boot.ci(froh_depth.boot, conf=0.95, type=c("perc","bca"))
+
+froh_depth.ci
+#BOOTSTRAP CONFIDENCE INTERVAL CALCULATIONS
+#Based on 10000 bootstrap replicates
+#
+#CALL : 
+#boot.ci(boot.out = froh_depth.boot, conf = 0.95, type = c("perc", 
+#    "bca"))
+#
+#Intervals : 
+#Level     Percentile            BCa          
+#95%   (-0.0110,  0.0063 )   (-0.0109,  0.0064 )  
+#Calculations and Intervals on Original Scale
+
+# plot Froh vs depth
+
+#png(file="/home/tyler/Dropbox/research/jay/mosaic/figures/methods_evaluation/Froh_vs_depth_metapop_wide.png")
+par(mgp=c(2.65,1,0), mar=c(5,4.3,4,2) + 0.1)
+plot(x = meta$autosome_depth, y = meta$FROH_ALL, cex=1.5, pch=21, col=biotype_col, bg=alpha(biotype_col,0.6), xlab="Average sequencing depth",
+ylab=bquote(italic(F[ROH])),cex.lab=1.5, cex.axis=1.5, main="Metapopulation-wide AF")
+abline(a=froh_depth_model$coefficients[1], b=froh_depth_model$coefficients[2], col="gray40")
+legend('topright',legend=c("Contemporary CR","Resident CR","Donor population","Other M4"), fill=c("hotpink2","purple2","dodgerblue2","gold2"),bty='n',cex=1.2)
+text(x=11.3,y=0.074,label=bquote(italic(r)^2 == .(round(summary(froh_depth_model)$r.square, digits=5))), cex=1.3)
+#dev.off()
+
+--- end R code ---
+
+
+#
+#
+#
+
+
+## ---------- EFFECTS OF RELATEDNESS PRUNING ON INBREEDING ---------- ##
+
+Determine correlation between individual inbreeding estimated with ngsF using all indivivduals and a relatedness-pruned subset of individuals (no pairwise r > 0.4).
+All compared F were estimated using population-specific allele frequencies (the same reference population was used to estimate F).
+
+--- start R code ---
+
+library(boot)
+library(scales)
+
+# Read in F estimated using allele frequencies based on all individuals from each population/group (no relatedness pruning). The population-specific allele frequencies were used to 
+# estimate F. These are the 'F_PS_ALL' values in the inbreed_coefficient_alternate_calculations.tsv dryad file. 
+f.all <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_pop_specific_ref_AF.txt',head=TRUE)
+
+# Read in F estimated using allele frequencies based on subsets of individuals for which all pairwise relatedness was <= 0.4 (relatedness pruned). The population-specific allele 
+# frequencies were used to estimate F. These are the 'F' values in the M4_sequenced_individual_metadata.tsv dryad file.
+f.prune <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_pop_specific_ref_AF_fixedMAF.txt',head=TRUE)
+
+# read in metadata
+meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE)
+
+meta$F.ALL <- sapply(meta$LAB_ID, function(x,df){df$F_POP_SPECIFIC_AF[which(df$ID == x)]}, df=f.all, USE.NAMES=FALSE)
+meta$F.PRUNE <- sapply(meta$LAB_ID, function(x,df){df$F_POP_SPECIFIC_AF[which(df$ID == x)]}, df=f.prune, USE.NAMES=FALSE)
+
+# test for correlation between F estimated with and without relatedness pruning
+
+fmod <- lm(meta$F.PRUNE ~ meta$F.ALL)
+
+summary(fmod)
+#
+#Call:
+#lm(formula = meta$F.PRUNE ~ meta$F.ALL)
+#
+#Residuals:
+#       Min         1Q     Median         3Q        Max 
+#-0.0142090 -0.0018693  0.0004139  0.0020509  0.0089352 
+#
+#Coefficients:
+#             Estimate Std. Error t value Pr(>|t|)    
+#(Intercept) 3.065e-05  4.330e-04   0.071    0.944    
+#meta$F.ALL  9.539e-01  1.666e-02  57.240   <2e-16 ***
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+#
+#Residual standard error: 0.003527 on 85 degrees of freedom
+#Multiple R-squared:  0.9747,   Adjusted R-squared:  0.9744 
+#F-statistic:  3276 on 1 and 85 DF,  p-value: < 2.2e-16
+
+shapiro.test(resid(fmod))
+#
+#       Shapiro-Wilk normality test
+#
+#data:  resid(fmod)
+#W = 0.92922, p-value = 0.0001408
+
+#hist(resid(fmod),breaks=20) # errors appear to deviate only slightly from a normal distribution, but will still bootstrap to test for correlation
+
+ftype.ci
+#BOOTSTRAP CONFIDENCE INTERVAL CALCULATIONS
+#Based on 10000 bootstrap replicates
+#
+#CALL : 
+#boot.ci(boot.out = ftype.boot, conf = 0.99, type = c("perc", 
+#    "bca"))
+#
+#Intervals : 
+#Level     Percentile            BCa          
+#99%   ( 0.7792,  0.9968 )   ( 0.8539,  1.0112 )  
+#Calculations and Intervals on Original Scale
+#Some BCa intervals may be unstable
+
+# plot correlation between F with and without relatedness pruning
+meta$ptype = biopoint(meta$pop)
+meta$popcol = popcolor(meta)
+
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/methods_evaluation/ngsF_correlation_with_v_without_rpruning.png',width=7, height=7, units='in', res=300)
+par(mgp=c(2.8,1,0))
+plot(x=meta$F.ALL, y=meta$F.PRUNE, col=alpha(meta$popcol,0.6), bg=alpha(meta$popcol,0.6), pch=meta$ptype, cex=1.4, 
+xlab=expression(paste(italic(F), ", no pruning")), ylab=expression(paste(italic(F), ", relatedness pruned", sep="")), cex.axis=1.3, cex.lab=1.3)
+abline(0,1,lty="dashed",col="grey40")
+abline(a=fmod$coefficients[1], b=fmod$coefficients[2], col="grey40")
+text(x=0.12,y=0.093,label=bquote(italic(r)^2 == .(round(summary(fmod)$r.square, digits=5))), cex=1.3)
+#dev.off()
+
+
+# Note that the reason contemporary samples are not perfectly correlated despite not pruning (all pairwise r between contemporary individuals was < 0.4) is that for the pruned analyses
+# ngsF was run with a starting F from a previous iteration involving all individuals. That is, the optimization for estimating F was slightly different.
+
+# Examine correlation between F with and without r-pruning with Contemporary individuals excluded because none were pruned so will drive up correlation
+
+meta.sub <- meta[-which(meta$pop == "Contemporary"),]
+
+fmod.sub <- lm(meta.sub$F.PRUNE ~ meta.sub$F.ALL)
+
+summary(fmod.sub)
+#
+#Call:
+#lm(formula = meta.sub$F.PRUNE ~ meta.sub$F.ALL)
+#
+#Residuals:
+#       Min         1Q     Median         3Q        Max 
+#-0.0145742 -0.0008637  0.0002232  0.0017673  0.0090174 
+#
+#Coefficients:
+#                Estimate Std. Error t value Pr(>|t|)    
+#(Intercept)    0.0005454  0.0005599   0.974    0.334    
+#meta.sub$F.ALL 0.9471035  0.0238523  39.707   <2e-16 ***
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+#
+#Residual standard error: 0.00384 on 57 degrees of freedom
+#Multiple R-squared:  0.9651,   Adjusted R-squared:  0.9645 
+#F-statistic:  1577 on 1 and 57 DF,  p-value: < 2.2e-16
+
+shapiro.test(resid(fmod.sub))
+#
+#       Shapiro-Wilk normality test
+#
+#data:  resid(fmod.sub)
+#W = 0.86443, p-value = 9.684e-06
+
+#hist(resid(fmod.sub),breaks=15)
+
+# Normal distribution for errors is rejected by shapiro test, but they appear to only subtly deviate from normal.
+# Will also calculate 95% bootstrap CI to test for a significant correlation using a nonparametric approach.
+
+set.seed(61772)
+
+ftype_sub.boot <- boot(data.frame(x=meta.sub$F.ALL, y=meta.sub$F.PRUNE), getBeta1, R=10000, stype="i", sim="ordinary")
+ftype_sub.ci <- boot.ci(ftype_sub.boot, conf=0.95, type=c("perc","bca"))
+
+ftype_sub.ci
+#BOOTSTRAP CONFIDENCE INTERVAL CALCULATIONS
+#Based on 10000 bootstrap replicates
+#
+#CALL : 
+#boot.ci(boot.out = ftype_sub.boot, conf = 0.95, type = c("perc", 
+#    "bca"))
+#
+#Intervals : 
+#Level     Percentile            BCa          
+#95%   ( 0.8349,  1.0006 )   ( 0.8812,  1.0182 )  
+#Calculations and Intervals on Original Scale
+
+# plot correlation between F with and without r-pruning (contemporary individuals excluded)
+
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/methods_evaluation/ngsF_correlation_with_v_without_rpruning_no_contemporary.png',width=7, height=7, units='in', res=300)
+par(mgp=c(2.8,1,0))
+plot(x=meta.sub$F.ALL, y=meta.sub$F.PRUNE, col=alpha(meta.sub$popcol,0.6), bg=alpha(meta.sub$popcol,0.6), pch=meta.sub$ptype, cex=1.4,
+xlab=expression(paste(italic(F), ", no pruning")), ylab=expression(paste(italic(F), ", relatedness pruned", sep="")), cex.axis=1.3, cex.lab=1.3)
+abline(0,1,lty="dashed",col="grey40")
+abline(a=fmod.sub$coefficients[1], b=fmod.sub$coefficients[2], col="grey40")
+text(x=0.065,y=0.05,label=bquote(italic(r)^2 == .(round(summary(fmod)$r.square, digits=2))), cex=1.3)
+#dev.off()
+
+--- end R code ---
+
+
+#
+#
+#
+
+
+## ---------- RELATIONSHIP BETWEEN DIFFERENT APPROACHES TO ESTIMATING INBREEDING ---------- ##
+
+--- start R code ---
+
+library(scales)
+library(boot)
+
+meta <- read.table('/home/tyler/Dropbox/research/jay/mosaic/metadata/M4_sequenced_FSJsamples_metadata.txt',head=TRUE)
+colnames(meta)[which(colnames(meta) == "pop_name_full")] = "POPULATION" # this is just to make column names consistent with the M4_sequenced_individual_metadata.tsv file on dryad
+biotype_col = bioclass_col(meta$POPULATION)
+meta$ptype = biopoint(meta$pop)
+meta$popcol = popcolor(meta)
+
+froh <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/roh/estimate/froh/mosaic_collated_froh.txt',head=TRUE) # Froh estimated using population-specific ('FROH_BEST') and metapopulation allele frequencies ('FROH_ALL_MOSAIC_AF') estimated from r-pruned subsets of individuals (all pairwise r <= 0.4)
+ngsf.all <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_formatted.txt',head=TRUE) # ngsF F estimated based on all individuals (no r-pruning) and metapopulation-wide reference population
+ngsf.ps <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_pop_specific_ref_AF_fixedMAF.txt', head=TRUE) # ngsF F estimated using population-specific allele frequencies from r-pruned subsets (all pairwise r <= 0.4)
+ngsf.ps2 <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/fstats/fsj_mosaic_biallelic_snps_main_autosomes_qc_all_F_pop_specific_ref_AF.txt',head=TRUE) # ngsF F estimated using population-specific allele frequencies without relatedness pruning
+
+# collate F and depth
+meta$F_ALL = sapply(meta$LAB_ID,function(x,df){df$F[which(df$SAMPLE == x)]},df=ngsf.all, USE.NAMES=FALSE)
+meta$F_PS = sapply(meta$LAB_ID,function(x,df){df$F_POP_SPECIFIC_AF[which(df$ID == x)]},df=ngsf.ps, USE.NAMES=FALSE)
+meta$F_PS2 = sapply(meta$LAB_ID,function(x,df){df$F_POP_SPECIFIC_AF[which(df$ID == x)]},df=ngsf.ps2, USE.NAMES=FALSE)
+meta$FROH_ALL = sapply(meta$LAB_ID,function(x,df){df$FROH_ALL_MOSAIC_AF[which(df$ID == x)]},df=froh, USE.NAMES=FALSE)
+meta$FROH_PS = sapply(meta$LAB_ID,function(x,df){df$FROH_BEST[which(df$ID == x)]},df=froh, USE.NAMES=FALSE)
+
+# I. Correlation between ngsF F estimated using population-specific allele frequencies (no relatedness pruning) vs metapopulation-wide allele frequencies (no relatedness pruning)
+
+ngsf_refaf_model2 = lm(F_PS2 ~ F_ALL, data=meta)
+
+summary(ngsf_refaf_model2)
+#
+#Call:
+#lm(formula = F_PS2 ~ F_ALL, data = meta)
+#
+#Residuals:
+#      Min        1Q    Median        3Q       Max 
+#-0.033605 -0.006243  0.001666  0.004432  0.026335 
+#
+#Coefficients:
+#             Estimate Std. Error t value Pr(>|t|)    
+#(Intercept) -0.006179   0.001326  -4.661 1.16e-05 ***
+#F_ALL        0.735630   0.034741  21.175  < 2e-16 ***
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+#
+#Residual standard error: 0.009164 on 85 degrees of freedom
+#Multiple R-squared:  0.8406,   Adjusted R-squared:  0.8388 
+#F-statistic: 448.4 on 1 and 85 DF,  p-value: < 2.2e-16
+
+shapiro.test(resid(ngsf_refaf_model2))
+#
+#       Shapiro-Wilk normality test
+#
+#data:  resid(ngsf_refaf_model2)
+#W = 0.92975, p-value = 0.0001501
+
+#hist(resid(ngsf_refaf_model2), breaks=30)
+
+# errors are slightly skewed and shapiro test rejects that they are normal so will use bootstrap to calculate 95 CI to test for significant correlation between ngsF F estimates
+
+ngsf_refaf2.boot <- boot(data.frame(x=meta$F_ALL, y=meta$F_PS2), getBeta1, R=10000, stype="i", sim="ordinary")
+ngsf_refaf2.ci <- boot.ci(ngsf_refaf2.boot, conf=0.95, type=c("perc","bca"))
+
+ngsf_refaf2.ci
+#BOOTSTRAP CONFIDENCE INTERVAL CALCULATIONS
+#Based on 10000 bootstrap replicates
+#
+#CALL : 
+#boot.ci(boot.out = ngsf_refaf2.boot, conf = 0.95, type = c("perc", 
+#    "bca"))
+#
+#Intervals : 
+#Level     Percentile            BCa          
+#95%   ( 0.5200,  0.8523 )   ( 0.5475,  0.8629 )  
+#Calculations and Intervals on Original Scale
+
+# plot relationship between ngsF F estimates (Figure S10, left panel)
+
+#png(file="/home/tyler/Dropbox/research/jay/mosaic/figures/methods_evaluation/ngsF_refAF_correlation_without_r_pruning.png", width=7, height=7, units='in', res=300)
+#png(file="/home/tyler/Dropbox/research/jay/mosaic/figures/methods_evaluation/ngsF_refAF_correlation_without_r_pruning_bw.png", width=7, height=7, units='in', res=300) # black and white point version
+par(mgp=c(2.65,1,0))
+
+plot(x = meta$F_ALL, y = meta$F_PS2, cex=1.5, pch=21, col="black", bg=alpha("grey40",0.6),
+xlab=expression(paste(italic(F)[ngsF], " (metapopulation reference)", sep="")), ylab=expression(paste(italic(F)[ngsF], " (population-specific reference)", sep="")),
+main=NULL, cex.lab=1.3, cex.axis=1.3) # black points with transparency
+
+#plot(x = meta$F_ALL, y = meta$F_PS2, cex=1.5, pch=meta$ptype, col=alpha(meta$popcol,0.6), bg=alpha(meta$popcol,0.6),
+#xlab=expression(paste(italic(F)[ngsF], " (metapopulation reference)", sep="")), ylab=expression(paste(italic(F)[ngsF], " (population-specific reference)", sep="")),
+#main=NULL, cex.lab=1.3, cex.axis=1.3) # points with population information
+
+abline(a=ngsf_refaf_model2$coefficients[1], b=ngsf_refaf_model2$coefficients[2], col="gray40")
+abline(a=0,b=1,col="gray50",lty="dashed")
+text(x=0.125,y=0.072,label=bquote(italic(r)^2 == .(round(summary(ngsf_refaf_model2)$r.square, digits=2))), cex=1.3)
+#dev.off()
+
+
+# II. Correlation between ngsF F estimated using population-specific allele frequencies (with relatedness pruning) vs metapopulation-wide allele frequencies (no relatedness pruning)
+
+ngsf_refaf_model = lm(F_PS ~ F_ALL, data=meta)
+
+summary(ngsf_refaf_model)
+#
+#Call:
+#lm(formula = F_PS ~ F_ALL, data = meta)
+#
+#Residuals:
+#      Min        1Q    Median        3Q       Max 
+#-0.032360 -0.006532  0.000648  0.004977  0.033704 
+#
+#Coefficients:
+#             Estimate Std. Error t value Pr(>|t|)    
+#(Intercept) -0.005427   0.001505  -3.607 0.000522 ***
+#F_ALL        0.684652   0.039429  17.364  < 2e-16 ***
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+#
+#Residual standard error: 0.0104 on 85 degrees of freedom
+#Multiple R-squared:  0.7801,   Adjusted R-squared:  0.7775 
+#F-statistic: 301.5 on 1 and 85 DF,  p-value: < 2.2e-16
+
+shapiro.test(resid(ngsf_refaf_model)) # errors depart slightly from normal distribution, so will bootstrap to test for significant correlation between F estimates
+#
+#       Shapiro-Wilk normality test
+#
+#data:  resid(ngsf_refaf_model)
+#W = 0.93742, p-value = 0.0003887
+
+ngsf_refaf.boot <- boot(data.frame(x=meta$F_ALL, y=meta$F_PS), getBeta1, R=10000, stype="i", sim="ordinary")
+ngsf_refaf.ci <- boot.ci(ngsf_refaf.boot, conf=0.95, type=c("perc","bca"))
+
+ngsf_refaf.ci
+#BOOTSTRAP CONFIDENCE INTERVAL CALCULATIONS
+#Based on 10000 bootstrap replicates
+#
+#CALL : 
+#boot.ci(boot.out = ngsf_refaf.boot, conf = 0.95, type = c("perc", 
+#    "bca"))
+#
+#Intervals : 
+#Level     Percentile            BCa          
+#95%   ( 0.4400,  0.8225 )   ( 0.4755,  0.8401 )  
+#Calculations and Intervals on Original Scale
+
+# plot relationship between ngsF F estimates
+
+#png(file="/home/tyler/Dropbox/research/jay/mosaic/figures/methods_evaluation/ngsF_refAF_correlation.png")
+par(mgp=c(2.65,1,0))
+plot(x = meta$F_ALL, y = meta$F_PS, cex=1.5, pch=21, col="black", bg=alpha("grey40",0.6),
+xlab=expression(paste(italic(F)[ngsF], " (metapopulation reference)", sep="")), ylab=expression(paste(italic(F)[ngsF], " (population-specific reference)", sep="")),
+main=NULL, cex.lab=1.3, cex.axis=1.3)
+abline(a=ngsf_refaf_model$coefficients[1], b=ngsf_refaf_model$coefficients[2], col="gray40")
+abline(a=0,b=1,col="gray50",lty="dashed")
+text(x=0.125,y=0.06,label=bquote(italic(r)^2 == .(round(summary(ngsf_refaf_model)$r.square, digits=5))), cex=1.3)
+#dev.off()
+
+# y-axis zoom
+#png(file="/home/tyler/Dropbox/research/jay/mosaic/figures/methods_evaluation/ngsF_refAF_correlation_ylim_zoom.png")
+par(mgp=c(2.65,1,0))
+plot(x = meta$F_ALL, y = meta$F_PS, cex=1.5, pch=21, col="black", bg=alpha("grey40",0.6),
+xlab=expression(paste(italic(F)[ngsF], " (metapopulation reference)", sep="")), ylab=expression(paste(italic(F)[ngsF], " (population-specific reference)", sep="")),
+main=NULL, cex.lab=1.3, cex.axis=1.3, ylim=c(0,0.03))
+abline(a=ngsf_refaf_model$coefficients[1], b=ngsf_refaf_model$coefficients[2], col="gray40")
+abline(a=0,b=1,col="gray50",lty="dashed")
+text(x=0.1,y=0.015,label=bquote(italic(r)^2 == .(round(summary(ngsf_refaf_model)$r.square, digits=5))), cex=1.3)
+#dev.off()
+
+
+# III. Correlation between Froh estimated using population-specific allele frequencies (estimated with r-pruning) vs metapopulation-wide allele frequencies (estimated with r-pruning)
+
+froh_refaf_model = lm(FROH_PS ~ FROH_ALL, data=meta)
+#
+#Call:
+#lm(formula = FROH_PS ~ FROH_ALL, data = meta)
+#
+#Residuals:
+#       Min         1Q     Median         3Q        Max 
+#-0.0110706 -0.0027381 -0.0002654  0.0032676  0.0140133 
+#
+#Coefficients:
+#             Estimate Std. Error t value Pr(>|t|)    
+#(Intercept) -0.002903   0.000984  -2.951   0.0041 ** 
+#FROH_ALL     0.990166   0.009671 102.381   <2e-16 ***
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+#
+#Residual standard error: 0.004142 on 85 degrees of freedom
+#Multiple R-squared:  0.992,    Adjusted R-squared:  0.9919 
+#F-statistic: 1.048e+04 on 1 and 85 DF,  p-value: < 2.2e-16
+
+shapiro.test(resid(froh_refaf_model)) # errors are normally distributed
+#
+#       Shapiro-Wilk normality test
+#
+#data:  resid(froh_refaf_model)
+#W = 0.98055, p-value = 0.2152
+
+# plot relationship between Froh estimates (Figure S10, right panel)
+
+#png(file="/home/tyler/Dropbox/research/jay/mosaic/figures/methods_evaluation/Froh_refAF_correlation.png", width=7, height=7, units='in', res=300)
+par(mgp=c(2.65,1,0))
+plot(x = meta$FROH_ALL, y = meta$FROH_PS, cex=1.5, pch=21, col="black", bg=alpha("grey40",0.6),
+xlab=expression(paste(italic(F)[ROH], " (metapopulation reference)", sep="")), ylab=expression(paste(italic(F)[ROH], " (population-specific reference)", sep="")),
+main=NULL, cex.lab=1.3, cex.axis=1.3)
+abline(a=froh_refaf_model$coefficients[1], b=froh_refaf_model$coefficients[2], col="gray40")
+abline(a=0,b=1,col="gray50",lty="dashed")
+text(x=0.165,y=0.12,label=bquote(italic(r)^2 == .(round(summary(froh_refaf_model)$r.square, digits=5))), cex=1.3)
+#dev.off()
+
+# IV. Correlation between ngsF F and Froh using population specific allele frequencies (estimated with r-pruning).
+
+fest_ps_model = lm(F_PS ~ FROH_PS, data=meta)
+
+summary(fest_ps_model)
+#
+#Call:
+#lm(formula = F_PS ~ FROH_PS, data = meta)
+#
+#Residuals:
+#      Min        1Q    Median        3Q       Max 
+#-0.027300 -0.006676 -0.000088  0.006165  0.068706 
+#
+#Coefficients:
+#             Estimate Std. Error t value Pr(>|t|)    
+#(Intercept) -0.021853   0.002981   -7.33 1.24e-10 ***
+#FROH_PS      0.390414   0.030344   12.87  < 2e-16 ***
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+#
+#Residual standard error: 0.01292 on 85 degrees of freedom
+#Multiple R-squared:  0.6607,   Adjusted R-squared:  0.6567 
+#F-statistic: 165.5 on 1 and 85 DF,  p-value: < 2.2e-16
+
+shapiro.test(resid(fest_ps_model)) # errors slightly skewed so will bootstrap to test for significant correlation between F and Froh
+#
+#       Shapiro-Wilk normality test
+#
+#data:  resid(fest_ps_model)
+#W = 0.86092, p-value = 1.539e-07
+
+fest_ps.boot <- boot(data.frame(x=meta$FROH_PS, y=meta$F_PS), getBeta1, R=10000, stype="i", sim="ordinary")
+fest_ps.ci <- boot.ci(fest_ps.boot, conf=0.95, type=c("perc","bca"))
+
+fest_ps.ci
+#BOOTSTRAP CONFIDENCE INTERVAL CALCULATIONS
+#Based on 10000 bootstrap replicates
+#
+#CALL : 
+#boot.ci(boot.out = fest_ps.boot, conf = 0.95, type = c("perc", 
+#    "bca"))
+#
+#Intervals : 
+#Level     Percentile            BCa          
+#95%   ( 0.2409,  0.5109 )   ( 0.2745,  0.5534 )  
+#Calculations and Intervals on Original Scale
+
+# plot ngsF F versus Froh
+
+#png(file="/home/tyler/Dropbox/research/jay/mosaic/figures/methods_evaluation/Festimator_pop_specific_ref_correlation.png")
+par(mgp=c(2.65,1,0))
+plot(x = meta$FROH_PS, y = meta$F_PS, cex=1.5, pch=21, col="black", bg=alpha("grey40",0.6),
+xlab=expression(paste(italic(F)[ROH], sep="")), ylab=expression(paste(italic(F)[ngsF], sep="")),
+main=NULL, cex.lab=1.3, cex.axis=1.3)
+abline(a=fest_ps_model$coefficients[1], b=fest_ps_model$coefficients[2], col="gray40")
+abline(a=0,b=1,col="gray50",lty="dashed")
+text(x=0.2,y=0.005,label=bquote(italic(r)^2 == .(round(summary(fest_ps_model)$r.square, digits=5))), cex=1.3)
+#dev.off()
+
+# V. Correlation between ngsF F and Froh estimated using metapopulation-wide allele frequencies.
+
+# Note that allele frequencies in the ngsF analysis were estimated without relatedness pruning while the allele frequencies
+# for the Froh analysis were estimated with relatedness pruning.
+
+fest_model = lm(F_ALL ~ FROH_ALL, data=meta)
+
+summary(fest_model)
+#
+#Call:
+#lm(formula = F_ALL ~ FROH_ALL, data = meta)
+#
+#Residuals:
+#      Min        1Q    Median        3Q       Max 
+#-0.030962 -0.004870  0.000180  0.005008  0.049092 
+#
+#Coefficients:
+#             Estimate Std. Error t value Pr(>|t|)    
+#(Intercept) -0.026737   0.002391  -11.18   <2e-16 ***
+#FROH_ALL     0.576623   0.023502   24.54   <2e-16 ***
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+#
+#Residual standard error: 0.01006 on 85 degrees of freedom
+#Multiple R-squared:  0.8763,   Adjusted R-squared:  0.8748 
+#F-statistic:   602 on 1 and 85 DF,  p-value: < 2.2e-16
+
+shapiro.test(resid(fest_model)) # errors deviate slightly from normal distribution so will bootstrap to test for significant correlation between ngsF F and Froh
+#
+#       Shapiro-Wilk normality test
+#
+#data:  resid(fest_model)
+#W = 0.89818, p-value = 4.665e-06
+
+
+fest.boot <- boot(data.frame(x=meta$FROH_ALL, y=meta$F_ALL), getBeta1, R=10000, stype="i", sim="ordinary")
+fest.ci <- boot.ci(fest.boot, conf=0.95, type=c("perc","bca"))
+
+fest.ci
+#BOOTSTRAP CONFIDENCE INTERVAL CALCULATIONS
+#Based on 10000 bootstrap replicates
+#
+#CALL : 
+#boot.ci(boot.out = fest.boot, conf = 0.95, type = c("perc", "bca"))
+#
+#Intervals : 
+#Level     Percentile            BCa          
+#95%   ( 0.4801,  0.6711 )   ( 0.4976,  0.7000 )  
+#Calculations and Intervals on Original Scale
+
+# plot ngsF F versus Froh
+
+#png(file="/home/tyler/Dropbox/research/jay/mosaic/figures/methods_evaluation/Festimator_metapop_ref_correlation.png")
+par(mgp=c(2.65,1,0))
+plot(x = meta$FROH_ALL, y = meta$F_ALL, cex=1.5, pch=21, col="black", bg=alpha("grey40",0.6),
+xlab=expression(paste(italic(F)[ROH], sep="")), ylab=expression(paste(italic(F)[ngsF], sep="")),
+main=NULL, cex.lab=1.3, cex.axis=1.3)
+abline(a=fest_model$coefficients[1], b=fest_model$coefficients[2], col="gray40")
+abline(a=0,b=1,col="gray50",lty="dashed")
+text(x=0.2,y=0.04,label=bquote(italic(r)^2 == .(round(summary(fest_model)$r.square, digits=5))), cex=1.3)
 #dev.off()
 
 --- end R code ---
@@ -3961,6 +5362,7 @@ points(x=1:nrow(kstat.sort), y=kstat.sort$Swtr, pch=1, col=pointcols, cex=1.7, l
 --- begin R code for comparing skew inference approaches ---
 
 library(scales)
+library(boot)
 
 ped1 <- read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/sequenced_contemporary/T_IE_20230512_to_seq_contemporary.pedstat1',head=TRUE)
 gendat <- read.table('/home/tyler/Dropbox/research/jay/mosaic/popgen/relatedness/skew/CR_T_IE_to_C_contributions_c0.0243058.skewstat3',head=TRUE)
@@ -3987,7 +5389,7 @@ for (i in 1:length(p_focal.unique)) {ped1.sort$ped.rank[which(ped1.sort$P_ANC_FO
 ped1.sort$gen.rank = unname(sapply(ped1.sort$ID,function(x,df){ifelse(is.na(x),NA,df$swtr.rank[which(df$ID == x)])},df=gendat.sort))
 ped1.sort$Swtr = unname(sapply(ped1.sort$ID,function(x,df){ifelse(is.na(x),NA,df$Swtr[which(df$ID == x)])},df=gendat.sort))
 
-# add M4 samples that were not in pedigree analysis - not necessary for core region only (T and IE) analysis
+# add M4 samples that were not in pedigree analysis - not necessary for core region only (T and IE) analysis so commented out
 #m4_labid <- gendat.sort$ID[grep("M4_", gendat.sort$ID)]
 #m4_missing <- NULL
 #for (id in m4_labid) {
@@ -4004,8 +5406,7 @@ ped1.sort$Swtr = unname(sapply(ped1.sort$ID,function(x,df){ifelse(is.na(x),NA,df
 # subset of ancestors in pedigree and genetic analysis
 share <- ped1.sort[which(!is.na(ped1.sort$ped.rank) & !is.na(ped1.sort$gen.rank)),]
 
-## test for correlation between K statistic and the the number of genomic copies for individuals common to both datasets
-
+# test for rank correlation between K statistic and the the number of genomic copies for individuals common to both datasets
 cor.test(x=share$Swtr, y=share$N_GENOME_COPIES, method="kendall", alternative="two.sided")
 #
 #	Kendall's rank correlation tau
@@ -4021,7 +5422,69 @@ cor.test(x=share$Swtr, y=share$N_GENOME_COPIES, method="kendall", alternative="t
 #In cor.test.default(x = share$Swtr, y = share$N_GENOME_COPIES, method = "kendall",  
 #  Cannot compute exact p-value with ties
 
-## line plot - Figure 4B
+# test for correlation between K statistic and the number of genomic copies for individuals common to both datasets
+skew_model <- lm(share$N_GENOME_COPIES ~ share$Swtr)
+
+summary(skew_model)
+#
+#Call:
+#lm(formula = share$N_GENOME_COPIES ~ share$Swtr)
+#
+#Residuals:
+#     Min       1Q   Median       3Q      Max 
+#-0.75371 -0.13914 -0.00378  0.06603  0.84904 
+#
+#Coefficients:
+#            Estimate Std. Error t value Pr(>|t|)    
+#(Intercept) -0.06603    0.05822  -1.134    0.264    
+#share$Swtr  30.30343    3.90832   7.754 2.88e-09 ***
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+#
+#Residual standard error: 0.2814 on 37 degrees of freedom
+#Multiple R-squared:  0.619,    Adjusted R-squared:  0.6087 
+#F-statistic: 60.12 on 1 and 37 DF,  p-value: 2.878e-09
+
+#summary(skew_model)$r.square
+[1] 0.6190199
+
+shapiro.test(resid(skew_model)) # errors deviate slightly from normal distribution so will use bootstrap to test for correlation between the two measures of genetic contribution
+#
+#       Shapiro-Wilk normality test
+#
+#data:  resid(skew_model)
+#W = 0.91163, p-value = 0.004835
+
+set.seed(7016301)
+
+skew_beta.boot <- boot(data.frame(x=share$Swtr, y=share$N_GENOME_COPIES), getBeta1, R=10000, stype="i", sim="ordinary")
+skew_beta.ci <- boot.ci(skew_beta.boot, conf=0.95, type=c("perc", "bca"))
+
+skew_beta.ci
+#BOOTSTRAP CONFIDENCE INTERVAL CALCULATIONS
+#Based on 10000 bootstrap replicates
+#
+#CALL : 
+#boot.ci(boot.out = skew_beta.boot, conf = 0.95, type = c("perc", 
+#    "bca"))
+#
+#Intervals : 
+#Level     Percentile            BCa          
+#95%   (12.35, 44.30 )   (15.67, 46.44 )  
+#Calculations and Intervals on Original Scale
+
+# scatterplot of K vs pedigree-based genetic contribution (Figure S11)
+
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/pedigree_vs_genetic_skew_correlation.png',width=7, height=7, units='in', res=300)
+par(mgp=c(2.9,1,0))
+plot(x=share$Swtr, y=share$N_GENOME_COPIES, xlab=expression(paste("Average rank-weighted relatedness (", italic(K),")", sep="")), 
+ylab="Pedigree expected number genomic copies", pch=21, col=alpha("black",0.8), bg=alpha("black",0.5),cex=1.4, cex.lab=1.4, cex.axis=1.4, lwd=1.2)
+abline(a=skew_model$coefficients[1], b=skew_model$coefficients[2], col="grey20")
+text(x=0.035,y=1.24,label=bquote(italic(r)^2 == .(round(summary(skew_model)$r.square, digits=2))), cex=1.3)
+#dev.off()
+
+
+# line plot (Figure 4B)
 
 library(scales)
 
@@ -4100,12 +5563,12 @@ for (i in urank.gen) {
 
 
 # make canvas and plot
-#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/ped_vs_genetic_skew_comparison.png',width=6, height=7, units='in', res=300)
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/ped_vs_genetic_skew_comparison_improved_label.png',width=6, height=7, units='in', res=300)
 
 x11(width=6,height=7)
 maxrank = max(ped1.sort$ped.rank, ped1.sort$gen.rank, na.rm=TRUE)
 y.marks = c(1,seq(from=5,to=2*round(maxrank/2),by=5))
-plot(1,type="n", xlab="", ylab="Contribution rank", ylim=c(maxrank, -1), xlim=c(0,1),xaxt='n', yaxt='n', cex.lab=1.3) # blank canvas
+plot(1,type="n", xlab="", ylab="Rank of the genetic contribution to the 2021 cohort", ylim=c(maxrank, -1), xlim=c(0,1),xaxt='n', yaxt='n', cex.lab=1.3) # blank canvas
 axis(side=1,at=c(xa,xb),labels=c("Pedigree","Genetic"),cex.axis=1.3) # x-axis
 axis(side=2,at=y.marks,labels=y.marks,cex.axis=1.3) # y-axis
 
@@ -4401,7 +5864,7 @@ popsize # census size
 #21 2022      134
 
 
-## Plot population size change over time - Figure 1C
+## Plot population size change over time (Figure 1C)
 
 # limit data to years 2003+ for plotting
 time.periods2 <- time.periods[2:length(time.periods)]
@@ -4451,3 +5914,552 @@ legend(x=2010.95,y=157, legend="Translocated contributors", lty=5, lwd=2, col="r
 #dev.off()
 
 --- end R code for demographic expansion ----
+
+
+#
+#
+#
+
+
+## ---------- BREEDING PAIR ANALYSIS ---------- ##
+
+Classify the frequency of different breeding pair types
+
+--- start R code ---
+
+# read in data
+# Note that the cr_ancestors_20240602.tsv and cr_ped_20240602.tsv files are deposited to dryad. The CUMULATIVE_NESTING_DATA_FINAL_05122023.tsv data 
+# are in the nest_metadata_20240602.tsv dryad file and also contained in the 'nest' tab of the M4_FSJ_monitoring.xlsx file on dryad.
+nest <- read.csv('/home/tyler/Dropbox/research/jay/mosaic/metadata/20230512_metadata/CUMULATIVE_NESTING_DATA_FINAL_05122023.tsv', head=TRUE, sep="\t")
+anc <- read.table('/home/tyler/Dropbox/research/jay/mosaic/simulations/pedigree_sims/inputs/cr_ancestors_20240602.tsv',head=FALSE)
+ped <- read.table('/home/tyler/Dropbox/research/jay/mosaic/simulations/pedigree_sims/inputs/cr_ped_20240602.tsv',head=TRUE)
+
+# get unique breeding pairs from 2003 (start of translocations) on
+nest = nest[which(nest$YEAR > 2002),]
+upairs <- unique(paste(nest$Breeding_Male,nest$Breeding_Female))
+pairdf = data.frame(male=sapply(upairs,function(x){strsplit(x, " ")[[1]][1]},USE.NAMES=FALSE), female=sapply(upairs,function(x){strsplit(x, " ")[[1]][2]},USE.NAMES=FALSE))
+
+# assign population
+res = anc$V1[which(anc$V2 == "RESIDENT")]
+ped$POPULATION[which(ped$ID %in% res == TRUE)] = "RESIDENT"
+pairdf$male_population = sapply(pairdf$male,function(x,df){idx = which(df$ID == x); ifelse(length(idx) > 0, df$POPULATION[idx], NA)}, df=ped, USE.NAMES=FALSE)
+pairdf$female_population = sapply(pairdf$female,function(x,df){idx = which(df$ID == x); ifelse(length(idx) > 0, df$POPULATION[idx], NA)}, df=ped, USE.NAMES=FALSE)
+
+# extract subset of pairs involving only banded ancestors (in the pedigree)
+pairdf.anc = pairdf[which(pairdf$male %in% anc$V1 == TRUE & !is.na(pairdf$male_population) & pairdf$female %in% anc$V1 == TRUE & !is.na(pairdf$female_population)),]
+
+# add the total number of fledged offspring by pair
+nest$Number_Fledged[which(nest$Number_Fledged == "FAILED" | nest$Number_Fledged == "ABANDONED")] = 0
+nest$Number_Fledged[which(nest$Number_Fledged == "" | nest$Number_Fledged == "N/A" | nest$Number_Fledged == "UNKNOWN")] = NA
+nest$Number_Fledged <- as.numeric(nest$Number_Fledged)
+
+pairdf.anc$total_fledged = 0
+for (i in 1:nrow(pairdf.anc)) {
+        nfledge = nest$Number_Fledged[which(nest$Breeding_Male == pairdf.anc$male[i] & nest$Breeding_Female == pairdf.anc$female[i])]
+        idx = which(!is.na(nfledge))
+        if (length(idx) < 1) { pairdf.anc$total_fledged[i] = NA } else pairdf.anc$total_fledged[i] = sum(nfledge[idx])
+}
+
+# sort dataframe in descending order of the number of fledged offspring
+pairdf.anc <- pairdf.anc[order(-pairdf.anc$total_fledged),]
+
+# export table of each ancestral pairs fledging success (Table S1).
+#write.table(pairdf.anc, file='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/ancestor_pair_fledging.txt', col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE)
+
+# Tabulate fleding success by pairing type
+
+pairdf.anc$pair_type = NA
+for (i in 1:nrow(pairdf.anc)) {
+        if (pairdf.anc$male_population[i] == "RESIDENT" && pairdf.anc$female_population[i] == "RESIDENT") {
+                pairdf.anc$pair_type[i] = "RESIDENT"
+        } else if ((pairdf.anc$male_population[i] == "RESIDENT" && pairdf.anc$female_population[i] != "RESIDENT") || 
+                (pairdf.anc$male_population[i] != "RESIDENT" && pairdf.anc$female_population[i] == "RESIDENT")) {
+                pairdf.anc$pair_type[i] = "RESIDENT_x_TRANSLOCATED"
+        } else if (pairdf.anc$male_population[i] != "RESIDENT" && pairdf.anc$female_population[i] != "RESIDENT" && pairdf.anc$male_population[i] == pairdf.anc$female_population[i]) {
+                pairdf.anc$pair_type[i] = "TRANSLOCATED_SAME"
+        } else {
+                pairdf.anc$pair_type[i] = "TRANSLOCATED_MIXED"
+        }
+}
+
+pairtype.df = data.frame(pair_type = unique(pairdf.anc$pair_type), n_pairs = NA, total_fledged = NA)
+for (i in 1:nrow(pairtype.df)) {
+        idx = which(pairdf.anc$pair_type == pairtype.df$pair_type[i])
+        pairtype.df$n_pairs[i] = length(idx)
+        fledge = pairdf.anc$total_fledged[idx]
+        if (length(which(is.na(fledge))) == length(fledge)) { pairtype.df$total_fledged[i] = NA } else { pairtype.df$total_fledged[i] = sum(fledge,na.rm=TRUE) }
+}
+
+# order by number of pairs
+pairtype.df = pairtype.df[order(-pairtype.df$n_pairs),]
+
+#write.table(pairtype.df, file='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/ancestor_pair_type_fledging.txt', col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE)
+
+--- end R code ---
+
+
+#
+#
+#
+
+
+## ---------- SIMULATION REPRODUCTIVE SKEW ANALYSIS ---------- ##
+
+Examine expected genetic contributions in simulations parameterized by the Mosaic Core Region pedigree but with uniformly random pairing (for breeding) and reproduction.
+
+# Simulations and relateStats analysis of CR population
+
+Note that for 'pedSimStats_v1.pl' (https://github.com/tplinderoth/research_studies/blob/main/Mosaic_FSJ/scripts/pedSimStats_v1.pl) was technically used to estimate 
+pedigree statistics from the simulations. An updated version of this script, pedSimStats.pl (https://github.com/tplinderoth/research_studies/blob/main/Mosaic_FSJ/scripts/pedSimStats.pl), 
+should produce identical results. The updates made to this script were to incorporate pedigree inbreeding calculations, but all original functionality of 'v1' should be maintained.
+
+$ sbatch sim_pedigree_analysis_array.sh
+implements:
+
+--- start bash code ---
+
+SEED_F="/mnt/research/Fitz_Lab/projects/mosaic/simulations/pedigree_sims/inputs/seeds/seeds_${SLURM_ARRAY_TASK_ID}.txt"
+PED_F='/mnt/research/Fitz_Lab/projects/mosaic/simulations/pedigree_sims/inputs/cr_ped_20240602.tsv'
+JAY_META_F='/mnt/research/Fitz_Lab/projects/mosaic/simulations/pedigree_sims/inputs/jayid_metadata_20240602.tsv'
+NEST_META_F='/mnt/research/Fitz_Lab/projects/mosaic/simulations/pedigree_sims/inputs/nest_metadata_20240602.tsv'
+ANC_F='/mnt/research/Fitz_Lab/projects/mosaic/simulations/pedigree_sims/inputs/cr_ancestors_20240602.tsv'
+FOCAL_F='/mnt/research/Fitz_Lab/projects/mosaic/simulations/pedigree_sims/inputs/res_trans_focal_IDs.txt'
+SIMPED='/mnt/research/Fitz_Lab/projects/mosaic/simulations/pedigree_sims/scripts/simPed.R'
+RELSTATS='/mnt/research/Fitz_Lab/software/PopGenomicsTools/relateStats'
+SIM_WRAPPER='/mnt/research/Fitz_Lab/projects/mosaic/simulations/pedigree_sims/scripts/pedSimStats_v1.pl'
+OUTPREFIX="/mnt/research/Fitz_Lab/projects/mosaic/simulations/pedigree_sims/results/cr_sim_analysis_${SLURM_ARRAY_TASK_ID}"
+
+CMD="$SIM_WRAPPER \
+--ped_file $PED_F \
+--indmeta $JAY_META_F \
+--nestmeta $NEST_META_F \
+--ancfile $ANC_F \
+--out $OUTPREFIX \
+--simexec $SIMPED \
+--statsexec $RELSTATS \
+--focal_ind $FOCAL_F \
+--seed_file $SEED_F \
+--rp 0 \
+--maxoffspring 5 \
+--mature 2 \
+--p_male 0.5 \
+2>/dev/null"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
+
+--- end bash code ---
+
+Concatenate population analysis output from parallel jobs
+
+--- begin bash code ---
+
+for yr in {2002..2022}
+do
+	cmd="(cat cr_sim_analysis_1_${yr}.tsv"
+	for i in {2..10}; do cmd+=" && tail -n+2 cr_sim_analysis_${i}_${yr}.tsv"; done
+	cmd+=") > cr_sim_analysis_${yr}.tsv"
+	eval $cmd
+	wait	
+done
+
+--- end bash code ---
+
+# Simulations and relateStats analysis of cohorts
+
+$ sbatch sim_pedigree_cohort_analysis_array.sh
+implements:
+
+--- begin bash code ---
+
+SEED_F="/mnt/research/Fitz_Lab/projects/mosaic/simulations/pedigree_sims/inputs/seeds/seeds_${SLURM_ARRAY_TASK_ID}.txt"
+PED_F='/mnt/research/Fitz_Lab/projects/mosaic/simulations/pedigree_sims/inputs/cr_ped_20240602.tsv'
+JAY_META_F='/mnt/research/Fitz_Lab/projects/mosaic/simulations/pedigree_sims/inputs/jayid_metadata_20240602.tsv'
+NEST_META_F='/mnt/research/Fitz_Lab/projects/mosaic/simulations/pedigree_sims/inputs/nest_metadata_20240602.tsv'
+ANC_F='/mnt/research/Fitz_Lab/projects/mosaic/simulations/pedigree_sims/inputs/cr_ancestors_20240602.tsv'
+FOCAL_F='/mnt/research/Fitz_Lab/projects/mosaic/simulations/pedigree_sims/inputs/res_trans_focal_IDs.txt'
+SIMPED='/mnt/research/Fitz_Lab/projects/mosaic/simulations/pedigree_sims/scripts/simPed.R'
+RELSTATS='/mnt/research/Fitz_Lab/software/PopGenomicsTools/relateStats'
+SIM_WRAPPER='/mnt/research/Fitz_Lab/projects/mosaic/simulations/pedigree_sims/scripts/pedSimStats_v1.pl'
+OUTPREFIX="/mnt/research/Fitz_Lab/projects/mosaic/simulations/pedigree_sims/results/cr_sim_cohort_analysis_${SLURM_ARRAY_TASK_ID}"
+
+CMD="$SIM_WRAPPER \
+--ped_file $PED_F \
+--indmeta $JAY_META_F \
+--nestmeta $NEST_META_F \
+--ancfile $ANC_F \
+--out $OUTPREFIX \
+--simexec $SIMPED \
+--statsexec $RELSTATS \
+--focal_ind $FOCAL_F \
+--seed_file $SEED_F \
+--rp 0 \
+--maxoffspring 5 \
+--mature 2 \
+--p_male 0.5 \
+--cohort \
+2>/dev/null"
+
+printf "\n%s\n\n" "$CMD"
+
+eval $CMD
+
+--- end bash code ---
+
+Concatenate cohort analysis output from parallel jobs
+
+--- begin bash code ---
+
+for yr in {2002..2022}
+do
+	cmd="(cat cr_sim_cohort_analysis_1_${yr}.tsv"
+	for i in {2..10}; do cmd+=" && tail -n+2 cr_sim_cohort_analysis_${i}_${yr}.tsv"; done
+	cmd+=") > cr_sim_cohort_analysis_${yr}.tsv"
+	eval $cmd
+	wait
+done
+
+--- end bash code ---
+
+
+# Make plots and calculate statitsics for the expected genetic contributions from simulations
+
+--- begin R code ---
+
+# load libraries
+library(ggplot2)
+library(scales) # alpha()
+library(shape) # Arrows()
+
+# parse data
+ped = read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/cr_ped_20230512.tsv',head=TRUE)
+anc = read.table('/home/tyler/Dropbox/research/jay/mosaic/simulations/pedigree_sims/inputs/cr_ancestors_20240602.tsv',head=FALSE)
+cohort_contribute = read.table('/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/number_contributing_lineages_to_cohorts_cr_ped_20230512.tsv',head=TRUE)
+sim_prefix='/home/tyler/Dropbox/research/jay/mosaic/simulations/pedigree_sims/results/cr_sim_analysis'
+sim_cohort_prefix='/home/tyler/Dropbox/research/jay/mosaic/simulations/pedigree_sims/results/cr_sim_cohort_analysis'
+obsdir='/home/tyler/Dropbox/research/jay/mosaic/pedigree/results/pop_temporal'
+pedres = list(year=2002:2022, data=list())
+
+for (i in 1:length(pedres$year)) {
+	yr = pedres$year[i]
+	pedres$sim[[i]] <- read.table(paste0(sim_prefix,"_",yr,".tsv"), head=TRUE)
+	cohort_sim <- read.table(paste0(sim_cohort_prefix,"_",yr,".tsv"), head=TRUE)
+	if (identical(pedres$sim[[i]]$SEED, cohort_sim$SEED) == TRUE) {
+		pedres$sim[[i]]$N_RESIDENT_CONTRIBUTORS_COHORT = cohort_sim$N_RESIDENT_CONTRIBUTORS
+		pedres$sim[[i]]$N_TRANSLOCATED_CONTRIBUTORS_COHORT = cohort_sim$N_TRANSLOCATED_CONTRIBUTORS
+	} else stop("seeds in population and cohort simulations differ\n")
+	pedres$obs[[i]] <- read.table(paste0(obsdir,"/T_IE_20230512_",yr,"_pop_contribution.pedstat1"), head=TRUE)
+	pedres$obs[[i]]$ORIGIN = unname(sapply(pedres$obs[[i]]$ID, function(x,df){df$V2[which(df$V1 == x)]}, df=anc))
+}
+
+top16 = head(pedres$obs[[length(pedres$year)]][order(-pedres$obs[[length(pedres$year)]]$P_ANC_FOCAL),], n=16)$ID
+top16.mod = gsub("-",".",top16)
+
+# make data.frame of simulation stat quantiles
+ci.df = NULL
+for (i in 1:length(pedres$year)) {
+	# max contributions CI
+	max.q = unname(quantile(pedres$sim[[i]]$MAX_CONTRIBUTION, c(0, 0.025, 0.05, 0.95, 0.975, 1)))
+	# number resident contributors CI
+	res.q = unname(quantile(pedres$sim[[i]]$N_RESIDENT_CONTRIBUTORS_COHORT, c(0, 0.025, 0.05, 0.95, 0.975, 1), na.rm=TRUE))
+	# number translocated individuals CI
+	trans.q = unname(quantile(pedres$sim[[i]]$N_TRANSLOCATED_CONTRIBUTORS_COHORT, c(0, 0.025, 0.05,0.95, 0.975, 1), na.rm=TRUE))
+	# RLS-K quantiles
+	rlsk.q = unname(quantile(pedres$sim[[i]]$RLS.K, c(0, 0.025, 0.05, 0.95, 0.975, 1), na.rm=TRUE))
+	# WSA-K quantiles
+	wsak.q = unname(quantile(pedres$sim[[i]]$WSA.K, c(0, 0.025, 0.05,0.95, 0.975, 1), na.rm=TRUE))
+	# top 16 contributors to 2022 qauntiles (in observed data)
+	idx = which(colnames(pedres$sim[[i]]) %in% top16.mod == TRUE)
+	top16_sim_p = sapply(1:nrow(pedres$sim[[i]]), function(x,j,df){sum(df[x,j])},j=idx,df=pedres$sim[[i]])
+	top16.q = unname(quantile(top16_sim_p, c(0, 0.025, 0.05, 0.95, 0.975, 1), na.rm=TRUE))
+	
+	# observed values
+	rlsk.obs = pedres$obs[[i]]$P_ANC_FOCAL[which(pedres$obs[[i]]$ID == "RLS-K")]
+	wsak.obs = pedres$obs[[i]]$P_ANC_FOCAL[which(pedres$obs[[i]]$ID == "WSA-K")]
+	top16_obs_p = sum(pedres$obs[[i]]$P_ANC_FOCAL[which(pedres$obs[[i]]$ID %in% top16 == TRUE)])
+	idx = which(cohort_contribute$YEAR == pedres$year[i])
+	n_res_contributors_cohort = NA
+	n_trans_contributors_cohort = NA
+	if (length(idx) > 0) {
+		n_res_contributors_cohort = cohort_contribute$N_RES[idx]
+		n_trans_contributors_cohort = cohort_contribute$N_TRANS[idx]
+	}
+	#n_res_contributors = length(which(pedres$obs[[i]]$ORIGIN == "RESIDENT" & pedres$obs[[i]]$P_ANC_FOCAL > 0))
+	#n_trans_contributors = length(which(pedres$obs[[i]]$ORIGIN == "TRANSLOCATED" & pedres$obs[[i]]$P_ANC_FOCAL > 0))
+
+	# add to dataframe
+	ci.df = rbind(ci.df,data.frame(year=pedres$year[i], max_min = max.q[1], max_2.5 = max.q[2], max_5 = max.q[3], max_95 = max.q[4], max_97.5 = max.q[5], max_max = max.q[6],
+	res_min = res.q[1], res_2.5 = res.q[2], res_5 = res.q[3], res_95 = res.q[4], res_97.5 = res.q[5], res_max = res.q[6],
+	trans_min = trans.q[1], trans_2.5 = trans.q[2], trans_5 = trans.q[3], trans_95 = trans.q[4], trans_97.5 = trans.q[5], trans_max = trans.q[6],
+	rlsk_min = rlsk.q[1], rlsk_2.5 = rlsk.q[2], rlsk_5 = rlsk.q[3], rlsk_95 = rlsk.q[4], rlsk_97.5 = rlsk.q[5], rlsk_max = rlsk.q[6],
+	wsak_min = wsak.q[1], wsak_2.5 = wsak.q[2], wsak_5 = wsak.q[3], wsak_95 = wsak.q[4], wsak_97.5 = wsak.q[5], wsak_max = wsak.q[6],
+	top16_min = top16.q[1], top16_2.5 = top16.q[2], top16_5 = top16.q[3], top16_95 = top16.q[4], top16_97.5 = top16.q[5], top16_max = top16.q[6],
+	rlsk_obs = rlsk.obs, wsak_obs = wsak.obs, top16_obs = top16_obs_p,
+	res_obs = n_res_contributors_cohort, trans_obs = n_trans_contributors_cohort))
+}
+
+# mask the years that RLS-K and and WSA-K were not in the Core Region
+# RLK-K translocated in 2003. Mask years before this for nice plotting.
+ci.df$rlsk_obs[1:which(ci.df$year == 2002)] = NA
+ci.df$rlsk_min[1:which(ci.df$year == 2002)] = NA
+ci.df$rlsk_5[1:which(ci.df$year == 2002)] = NA
+ci.df$rlsk_95[1:which(ci.df$year == 2002)] = NA
+ci.df$rlsk_max[1:which(ci.df$year == 2002)] = NA
+# WSA-K translocated in 2008. Mask years before this for nice plotting. 
+ci.df$wsak_obs[1:which(ci.df$year == 2007)] = NA
+ci.df$wsak_min[1:which(ci.df$year == 2007)] = NA
+ci.df$wsak_5[1:which(ci.df$year == 2007)] = NA
+ci.df$wsak_95[1:which(ci.df$year == 2007)] = NA
+ci.df$wsak_max[1:which(ci.df$year == 2007)] = NA
+
+# plot simulation max contribution and lower 0.95 quantile with observed RLS-K and WSA-K contributions over time (Figure S5A)
+
+first_lr_year = 2004 # this is the first year that local recruits were born into the CR
+
+ci.df.reprosub = ci.df[which(ci.df$year == first_lr_year):nrow(ci.df),]
+
+maxplot <- ggplot(ci.df.reprosub, aes(x=year, y=rlsk_obs)) + 
+theme_classic() +
+geom_ribbon(aes(ymin = max_min, ymax = max_max), fill="gray87") +
+geom_ribbon(aes(ymin = max_min, ymax = max_95), fill="gray65") + 
+geom_line(colour="red3", linewidth=1.5) +
+geom_line(aes(x=year, y=wsak_obs), colour="blue1", linewidth=1.5) + 
+scale_x_continuous(breaks=first_lr_year:2022) +
+scale_y_continuous(name="Maximum proportion of ancestor contribution", 
+breaks=seq(from=0,to=max(c(ci.df.reprosub$max_max, ci.df.reprosub$rlsk_obs, ci.df.reprosub$wsak_obs)+0.01,na.rm=TRUE), by=0.02)) +
+
+theme(legend.position="none", axis.text.x = element_text(size=17,color="black"), axis.ticks.length.x=unit(0.25,"cm"), axis.title.x=element_text(size=20, color="black"),
+axis.text.y = element_text(size=17,color="black"), axis.ticks.length.y=unit(0.25,"cm"),axis.title.y=element_text(size=20,color="black", vjust=1.5),
+axis.title.y.right = element_text(size=20, color="black", vjust=1.5))
+
+# uncomment to add line annotations
+#annotate(geom="text", x = 2004.7, y = 0.028, label = "RLS-K", color="red3", size=5.5) +
+#annotate(geom="text", x = 2008.4, y = 0.05, label = "WSA-K", color="blue1", size=5.5) +
+
+x11(width=16,height=7)
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/simulation/simulation_max_ancestor_contribution_.png',width=16, height=7, units='in', res=300)
+maxplot
+#dev.off()
+
+max(ci.df.reprosub$max_max) # maximum simulated contribution in a single year by a single individual
+#[1] 0.257174
+
+# plot simulated RLS-K and WSA-K max contributions and 0.95 quantiles, along with observed contribution lines over time (Figure S4)
+
+ci.df.rlsksub = ci.df[which(ci.df$year == 2003):nrow(ci.df),]
+
+top_pair_plot <- ggplot(ci.df.rlsksub, aes(x=year, y=rlsk_obs)) +
+theme_classic() +
+geom_ribbon(aes(ymin = rlsk_min, ymax = rlsk_95), fill="lightcoral", alpha=0.5) +
+geom_ribbon(aes(ymin = wsak_min, ymax = wsak_95), fill="lightblue3", alpha=0.6) +
+geom_line(aes(x=year, y=rlsk_max), colour="lightcoral", alpha=0.5, linewidth=1.3, linetype="dashed") +
+geom_line(aes(x=year, y=wsak_max), colour="lightblue3", alpha=0.6, linewidth=1.3, linetype="dashed") +
+geom_line(colour="red3", linewidth=1.5) +
+geom_line(aes(x=year, y=wsak_obs), colour="blue1", linewidth=1.5) +
+scale_x_continuous(breaks=ci.df.rlsksub$year[1]:2022) +
+scale_y_continuous(name="Proportion of ancestor contribution to population", 
+breaks=seq(from=0,to=max(c(ci.df.rlsksub$rlsk_max, ci.df.rlsksub$rlsk_obs)+0.01,na.rm=TRUE), by=0.02)) +
+
+theme(legend.position="none", axis.text.x = element_text(size=17,color="black"), axis.ticks.length.x=unit(0.25,"cm"), axis.title.x=element_text(size=20, color="black"),
+axis.text.y = element_text(size=17,color="black"), axis.ticks.length.y=unit(0.25,"cm"),axis.title.y=element_text(size=20,color="black", vjust=1.5),
+axis.title.y.right = element_text(size=20, color="black", vjust=1.5))
+
+x11(width=16,height=7)
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/simulation/simulation_rlsk_wsak_contribution.png',width=16, height=7, units='in', res=300)
+top_pair_plot
+#dev.off()
+
+# plot simulated maximum and 0.95 quantile for the observed top 16 genetic contributors along with their observed contribution line over time (Figure S2)
+
+top16_first_year = min(ped$COHORT[which(ped$ID %in% top16 == TRUE)])
+
+ci.df.top16sub = ci.df[which(ci.df$year == top16_first_year):nrow(ci.df),]
+
+top16_plot <- ggplot(ci.df.top16sub, aes(x=year, y=top16_obs)) +
+theme_classic() +
+geom_ribbon(aes(ymin = top16_min, ymax = top16_max), fill="gray87") +
+geom_ribbon(aes(ymin = top16_min, ymax = top16_95), fill="gray65") +
+geom_line(colour="black", linewidth=1.5) +
+scale_x_continuous(breaks=top16_first_year:2022) +
+scale_y_continuous(name="Proportion ancestor contribution by top contributors", breaks=seq(from=0,to=max(c(ci.df.top16sub$top16_max, ci.df.top16sub$top16_obs)+0.01,na.rm=TRUE), by=0.10)) +
+
+theme(legend.position="none", axis.text.x = element_text(size=17,color="black"), axis.ticks.length.x=unit(0.25,"cm"), axis.title.x=element_text(size=20, color="black"),
+axis.text.y = element_text(size=17,color="black"), axis.ticks.length.y=unit(0.25,"cm"),axis.title.y=element_text(size=20,color="black", vjust=1.5),
+axis.title.y.right = element_text(size=20, color="black", vjust=1.5))
+
+x11(width=16,height=7)
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/simulation/simulation_top16_ancestors_contribution.png',width=16, height=7, units='in', res=300)
+top16_plot
+#dev.off()
+
+# mean simulated contributions of observed top 16 contributors
+
+top16_stats = NULL
+for (i in 1:length(pedres$year)) {
+	idx = which(colnames(pedres$sim[[i]]) %in% top16.mod == TRUE)
+	top16_sum_p = sapply(1:nrow(pedres$sim[[i]]), function(x,j,df){sum(df[x,j])},j=idx,df=pedres$sim[[i]])
+	top16_stats = rbind(top16_stats, data.frame(YEAR=pedres$year[i], MEAN=mean(top16_sum_p), SD=sd(top16_sum_p), MEDIAN=median(top16_sum_p)))
+}
+
+
+mean(top16_stats$MEAN[which(top16_stats$YEAR >=2015)])  # average expected contribution from 2015-2022
+#[1] 0.5248555
+
+max(ci.df.top16sub$top16_max) # maximum simulated contribution
+#[1] 0.8041158
+ci.df.top16sub$year[which(ci.df.top16sub$top16_max == max(ci.df.top16sub$top16_max))] # year of max contribution
+#[1] 2019
+
+length(which(ci.df.top16sub$top16_obs > ci.df.top16sub$top16_max)) # number of years that the observed contributions exceeded the max simulated contribution
+#[1] 10
+ci.df.top16sub$year[which(ci.df.top16sub$top16_obs > ci.df.top16sub$top16_max)] # years that the observed contributions exceeded max simulated contribution
+#[1] 2010 2011 2012 2015 2016 2018 2019 2020 2021 2022
+
+
+# plot simulated number of contributing resident and translocated lineages 95 interpercentile along with observed lines over time (Figure S3B)
+
+contributors_plot <- ggplot(ci.df.reprosub, aes(x=year, y=trans_obs)) +
+theme_classic() +
+geom_ribbon(aes(ymin = trans_97.5, ymax = trans_max), fill="violetred", alpha=0.2) +
+geom_ribbon(aes(ymin = trans_2.5, ymax = trans_97.5), fill="violetred", alpha=0.5) +
+geom_ribbon(aes(ymin = trans_min, ymax = trans_2.5), fill="violetred", alpha=0.2) +
+geom_ribbon(aes(ymin = res_97.5, ymax = res_max), fill="slateblue", alpha=0.2) +
+geom_ribbon(aes(ymin = res_2.5, ymax = res_97.5), fill="slateblue", alpha=0.5) +
+geom_ribbon(aes(ymin = res_min, ymax = res_2.5), fill="slateblue", alpha=0.2) +
+geom_line(aes(x=year, y=trans_min), colour="violetred", alpha=0.1, linewidth=1, linetype="solid") +
+geom_line(aes(x=year, y=trans_max), colour="violetred", alpha=0.1, linewidth=1, linetype="solid") +
+geom_line(aes(x=year, y=res_min), colour="slateblue", alpha=0.1, linewidth=1, linetype="solid") +
+geom_line(aes(x=year, y=res_max), colour="slateblue", alpha=0.1, linewidth=1, linetype="solid") +
+geom_line(colour="violetred", linewidth=1.5) +
+geom_line(aes(x=year, y=res_obs), colour="slateblue", linewidth=1.5) +
+scale_x_continuous(breaks=ci.df.reprosub$year[1]:2022) +
+scale_y_continuous(name="Number ancestor contributors to cohort", 
+breaks=seq(from=0,to=max(c(ci.df.reprosub$trans_max, ci.df.reprosub$res_max, ci.df.reprosub$trans_obs, ci.df.reprosub$res_max),na.rm=TRUE), by=2)) +
+
+theme(legend.position="none", axis.text.x = element_text(size=17,color="black"), axis.ticks.length.x=unit(0.25,"cm"), axis.title.x=element_text(size=20, color="black"),
+axis.text.y = element_text(size=17,color="black"), axis.ticks.length.y=unit(0.25,"cm"),axis.title.y=element_text(size=20,color="black", vjust=1.5),
+axis.title.y.right = element_text(size=20, color="black", vjust=1.5))
+
+x11(width=16,height=7)
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/simulation/simulation_number_ancestor_contributors_cohort.png',width=16, height=7, units='in', res=300)
+contributors_plot
+#dev.off()
+
+# Maximum average contribution function
+
+calcMaxAvg <- function(pedres=NULL, ped = NULL, start_year) {
+	# make names vector of years ancestors enter the CR
+	sim_anc_id = colnames(pedres$sim[[1]])[5:(ncol(pedres$sim[[1]])-2)]
+	ped$ID_MOD = gsub("-",".",gsub("^-","X.",ped$ID))
+	anc_cohort = sapply(sim_anc_id, function(x,df){df$COHORT[which(df$ID_MOD == x)[1]]}, df=ped)
+
+	# calculate max average proportion contribution by an individual in the ancestral group
+	max_avg = rep(NA,nrow(pedres$sim[[1]]))
+	ind_avg = rep(NA, length(5:(ncol(pedres$sim[[1]])-2)))
+	ind_val = rep(NA, length(pedres$year))
+	for (sim_n in 1:nrow(pedres$sim[[1]])) {
+	        print(sim_n)
+	        ind_avg[1:length(ind_avg)] = NA
+	        ind_iter = 1;
+	        for (ind_idx in 5:(ncol(pedres$sim[[1]])-2)) {
+	                id = colnames(pedres$sim[[yr_idx]])[ind_idx]
+	                ind_val[1:length(ind_val)] = NA
+	                year_iter = 1;
+	                for (yr_idx in which(pedres$year == start_year):length(pedres$year)) {
+	                        ind_val[year_iter] = ifelse(pedres$year[yr_idx] < anc_cohort[id], NA, pedres$sim[[yr_idx]][sim_n, ind_idx]) # max values if individual was not in population yet
+	                        year_iter = year_iter+1
+	                }
+	                #print(ind_val);
+	                ind_avg[ind_iter] = mean(ind_val, na.rm=TRUE)
+	                ind_iter = ind_iter+1
+	        }
+	        #print(ind_avg)
+	        max_avg[sim_n] = max(ind_avg, na.rm=TRUE)
+	}
+
+	return(max_avg)
+}
+
+
+# Histogram of maximum average contribution of any given individual considering all years (2002-2022). Only the years from when an individual 
+# entered the pedigree and on were considered in the averaging since before that their contribution is 'NA' and NAs were ignored in the mean calculation. This is Figure S5B.
+max_avg = calcMaxAvg(pedres = pedres, ped = ped, start_year = 2002)
+
+#write.table(data.frame(SEED=pedres$sim[[1]]$SEED, MAX_AVERAGE_P_FOCAL_ANC = max_avg), file='/home/tyler/Dropbox/research/jay/mosaic/simulations/pedigree_sims/results/cr_sim_analysis_max_average_p_focal_anc.txt', col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
+
+rlsk_max_avg = mean(sapply(which(pedres$year %in% 2003:2022 == TRUE),function(x,dat){dat$obs[[x]]$P_ANC_FOCAL[which(dat$obs[[x]]$ID == "RLS-K")]}, dat=pedres),na.rm=TRUE)
+rlsk_max_avg.p = length(which(max_avg >= rlsk_max_avg))/length(max_avg)
+wsak_max_avg = mean(sapply(which(pedres$year %in% 2008:2022 == TRUE),function(x,dat){dat$obs[[x]]$P_ANC_FOCAL[which(dat$obs[[x]]$ID == "WSA-K")]}, dat=pedres),na.rm=TRUE)
+wsak_max_avg.p = length(which(max_avg >= wsak_max_avg))/length(max_avg)
+xmax = 0.18 # max(max_avg) = 0.1668423
+xmin = 0.02 # min(max_avg) = 0.0448871
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/simulation/simulation_max_avg_pfocalanc_allyears_histogram.png', width=7, height=7, units='in', res=300)
+hist(max_avg, xlab="Maximum average proportion of ancestor contribution", ylab="Density", main="", freq=FALSE, breaks=40, xlim=c(xmin,xmax),xaxt="n", cex.axis=1.3, cex.lab=1.3)
+axis(side=1, at=seq(from=xmin, to=xmax, by=0.02), cex.axis=1.3)
+max.avg.dense <- density(max_avg, bw=0.003)
+lines(max.avg.dense, col=alpha("blue",0.5), lwd=1.5)
+lines(x=c(rlsk_max_avg,rlsk_max_avg), y=c(0,8), col="red3", lwd=2)
+text(x=rlsk_max_avg-0.005, y=9, label=substitute(paste("RLS-K ", italic(p), " = ", x, sep=""), list(x=rlsk_max_avg.p)), cex=1.3, adj=0)
+lines(x=c(wsak_max_avg,wsak_max_avg), y=c(0,15), col="red3", lwd=2)
+text(x=wsak_max_avg-0.005, y=16, label=substitute(paste("WSA-K ", italic(p), " = ", x, sep=""), list(x=wsak_max_avg.p)), cex=1.3, adj=0)
+#dev.off()
+
+max(max_avg) # maximum average contribution of a single ancestral lineage to the population
+#[1] 0.1668423
+
+
+# Histogram of maximum average population contribution by a single individual in 2022 with observed RLS-K contribution
+
+idx.2022 = which(pedres$year == 2022)
+max.2022 = pedres$sim[[idx.2022]]$MAX_CONTRIBUTION
+xmin = 0.02 # min is 0.0534019
+xmax = 0.26 # max is 0.242063
+rlsk.2022 = pedres$obs[[idx.2022]]$P_ANC_FOCAL[which(pedres$obs[[idx.2022]]$ID == "RLS-K")]
+rlsk.2022.p = rlsk.2022.p = length(which(max.2022 >= rlsk.2022))/length(max.2022)
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/simulation/simulation_max_2022_contribution_histogram.png', width=7, height=7, units='in', res=300)
+hist(max.2022, xlab="Maximum proportion of 2022 ancestor contribution", ylab="Density", main="", freq=FALSE, breaks=40, xlim=c(xmin,xmax),xaxt="n", cex.axis=1.3, cex.lab=1.3)
+axis(side=1, at=seq(from=xmin, to=xmax, by=0.04), cex.axis=1.3)
+max.dense <- density(max.2022, bw=0.005)
+lines(max.dense, col=alpha("blue",0.5), lwd=1.5)
+lines(x=c(rlsk.2022,rlsk.2022), y=c(0,8), col="red3", lwd=2)
+text(x=rlsk.2022-0.01, y=8.5, label=substitute(paste("RLS-K ", italic(p), " = ", x, sep=""), list(x=rlsk.2022.p)), cex=1.3, adj=0)
+#dev.off()
+
+# Histogram of maximum number of contributors to 2022 cohort (Figure S3A)
+
+n_sim_contribute_cohort = rep(NA,nrow(pedres$sim[[1]]))
+cohort_idx = which(pedres$year == 2022)
+for (i in 1:length(n_sim_contribute_cohort)) {
+	n_sim_contribute_cohort[i] = pedres$sim[[cohort_idx]]$N_RESIDENT_CONTRIBUTORS_COHORT[i] + pedres$sim[[cohort_idx]]$N_TRANSLOCATED_CONTRIBUTORS_COHORT[i] 
+}
+
+cohort_obs_idx = which(ci.df$year == 2022)
+obs_cohort_contribute = ci.df$res_obs[cohort_obs_idx] + ci.df$trans_obs[cohort_obs_idx]
+n_sim_contribute_cohort.table = table(n_sim_contribute_cohort)
+barcol = rep('grey',length(n_sim_contribute_cohort.table))
+#barcol[which(names(n_sim_contribute_cohort.table) == as.character(obs_cohort_contribute))] = "red3"
+barcol[which(as.numeric(names(n_sim_contribute_cohort.table)) <= obs_cohort_contribute)] = "red3"
+cohort_contribute.p = length(which(n_sim_contribute_cohort <= obs_cohort_contribute))/length(n_sim_contribute_cohort)
+cohort_contribute_obs.p = length(which(n_sim_contribute_cohort == obs_cohort_contribute))/length(n_sim_contribute_cohort)
+arr.x = which(names(n_sim_contribute_cohort.table) == as.character(obs_cohort_contribute)) + 1
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/simulation/simulation_n_ancestor_contributors_2022.png', width=7, height=7, units='in', res=300)
+#png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/simulation/simulation_n_ancestor_contributors_2022_v2.png', width=7, height=7, units='in', res=300)
+png(file='/home/tyler/Dropbox/research/jay/mosaic/figures/simulation/simulation_n_ancestor_contributors_2022_v2_plain.png', width=7, height=7, units='in', res=300)
+barplot(n_sim_contribute_cohort.table, xlab="Number genetically contributing ancestors to 2022 cohort", ylab = "Frequency", cex.names=1.3, cex.axis=1.3, cex.lab=1.3, col=barcol)
+#Arrows(x0 = arr.x, x1 = arr.x, y0 = 800, y1=500, arr.type = "simple", lwd=2, col="red3")
+#Arrows(x0 = arr.x, x1 = arr.x, y0 = 800, y1=500, arr.type = "simple", lwd=2, col="black")
+#text(x=arr.x-1.5, y=840, label=substitute(paste(italic(p), " = ", x, sep=""), list(x=cohort_contribute_obs.p)), cex=1.3)
+#text(x=arr.x-1.5, y=840, label=substitute(paste(italic(p), " = ", x, sep=""), list(x=cohort_contribute.p)), cex=1.3)
+#dev.off()
+
+length(which(n_sim_contribute_cohort < obs_cohort_contribute))/length(n_sim_contribute_cohort) # probability of fewer than observed contributors to 2022 cohort
+#[1] 0.0544
+
+cohort_contribute_obs.p # probability of the observed number of contributors
+#[1] 0.046
+
+cohort_contribute.p # probility of less than or equal to the observed number of contributors
+#[1] 0.1004
+
+--- end R code ---

@@ -2,28 +2,28 @@
 #! This line is a comment
 #! Make sure you only have comments and #SBATCH directives between here and the end of the #SBATCH directives, or things will break
 #! Name of the job:
-#SBATCH -J fsj_group_snp_saf2
+#SBATCH -J postexp_sfs
 #! Account name for group, use SL2 for paying queue:
-#! #SBATCH -A ACCOUNT_NAME
+#SBATCH -A general
 #! Output filename:
 #! %A means slurm job ID and %a means array index
-#SBATCH --output=fsj_group_snp_saf2_%A_%a.out
+#SBATCH --output=postexp_sfs_fold_%A_%a.out
 #! Errors filename:
-#SBATCH --error=fsj_group_snp_saf2_%A_%a.err
+#SBATCH --error=postexp_sfs_fold_%A_%a.err
 
 #! Number of nodes to be allocated for the job (for single core jobs always leave this at 1)
 #SBATCH --nodes=1
 #! Number of tasks. By default SLURM assumes 1 task per node and 1 CPU per task.
 #SBATCH --ntasks=1
 #! How many many cores will be allocated per task?
-#SBATCH --cpus-per-task=24
+#SBATCH --cpus-per-task=12
 #! Estimated runtime: hh:mm:ss (job is force-stopped after if exceeded):
 #SBATCH --time=36:00:00
 #! Estimated maximum memory needed (job is force-stopped if exceeded):
-#SBATCH --mem=18000mb
+#SBATCH --mem=48000mb
 #! Submit a job array with index values between 0 and 31
 #! NOTE: This must be a range, not a single number
-#SBATCH --array=0-3
+#SBATCH --array=0-4
 
 #! This is the partition name.
 #! #SBATCH -p cclake
@@ -39,7 +39,7 @@
 #! . /etc/profile.d/modules.sh                # This line enables the module command
 #! module purge                               # Removes all modules still loaded
 #! module load rhel7/default-peta4            # REQUIRED - loads the basic environment
-module load Java/1.8.0_152 bzip2/1.0.6 zlib/1.2.11 Boost/1.67.0 GSL/2.6
+#! module load Java/1.8.0_152 bzip2/1.0.6 zlib/1.2.11 Boost/1.67.0 GSL/2.6
 
 #! Are you using OpenMP (NB this is unrelated to OpenMPI)? If so increase this
 #! export OMP_NUM_THREADS=1
@@ -56,15 +56,13 @@ echo "This is job" $SLURM_ARRAY_TASK_ID
 workdir="$SLURM_SUBMIT_DIR" # The value of SLURM_SUBMIT_DIR sets workdir to the directory
 cd $workdir
 
-GRP_ARR=('resident' 'translocated' 'C' 'translocated_CR')
+EXEC='/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/revision1_sfs/saf2sfs.pl'
+GRP_ARR=('contemporary' 'resident' 'resident_prune' 'translocated' 'translocated_prune')
 FSJGRP="${GRP_ARR[$SLURM_ARRAY_TASK_ID]}"
-BAMLIST="/mnt/research/Fitz_Lab/projects/mosaic/map/mosaic_${FSJGRP}_bam_list.txt"
-OUTPREFIX="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_biallelic_snps_main_autosomes_qc_${FSJGRP}"
-REGFILE='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ_V3_main_autosomes.txt'
-SITESFILE='/mnt/research/Fitz_Lab/projects/mosaic/variants/vcf/biallelic_snps/fsj_mosaic_biallelic_snps_main_autosomes_qc.pos'
-REF='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ.V3.fa'
+SAFIDX="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/revision1_sfs/${FSJGRP}_allsites_main_autosomes_qc_postprobs.saf.idx"
+OUTSFS="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/revision1_sfs/${FSJGRP}_allsites_main_autosomes_qc_postprobs_fold.sfs"
 
-CMD="angsd -bam $BAMLIST -out $OUTPREFIX -GL 1 -doSaf 1 -anc $REF -minQ 20 -minMapQ 20 -rf $REGFILE -sites $SITESFILE -P 4"
+CMD="realSFS print $SAFIDX | $EXEC 1 > $OUTSFS"
 
 printf "\n%s\n\n" "$CMD"
 

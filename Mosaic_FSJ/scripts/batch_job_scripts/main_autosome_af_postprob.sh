@@ -2,14 +2,14 @@
 #! This line is a comment
 #! Make sure you only have comments and #SBATCH directives between here and the end of the #SBATCH directives, or things will break
 #! Name of the job:
-#SBATCH -J fsj_group_snp_saf2
+#SBATCH -J fsj_group_dosaf2
 #! Account name for group, use SL2 for paying queue:
-#! #SBATCH -A ACCOUNT_NAME
+#SBATCH -A general
 #! Output filename:
 #! %A means slurm job ID and %a means array index
-#SBATCH --output=fsj_group_snp_saf2_%A_%a.out
+#SBATCH --output=fsj_group_dosaf2_%A_%a.out
 #! Errors filename:
-#SBATCH --error=fsj_group_snp_saf2_%A_%a.err
+#SBATCH --error=fsj_group_dosaf2_%A_%a.err
 
 #! Number of nodes to be allocated for the job (for single core jobs always leave this at 1)
 #SBATCH --nodes=1
@@ -18,12 +18,12 @@
 #! How many many cores will be allocated per task?
 #SBATCH --cpus-per-task=24
 #! Estimated runtime: hh:mm:ss (job is force-stopped after if exceeded):
-#SBATCH --time=36:00:00
+#SBATCH --time=12:00:00
 #! Estimated maximum memory needed (job is force-stopped if exceeded):
 #SBATCH --mem=18000mb
 #! Submit a job array with index values between 0 and 31
 #! NOTE: This must be a range, not a single number
-#SBATCH --array=0-3
+#SBATCH --array=1-5
 
 #! This is the partition name.
 #! #SBATCH -p cclake
@@ -39,7 +39,7 @@
 #! . /etc/profile.d/modules.sh                # This line enables the module command
 #! module purge                               # Removes all modules still loaded
 #! module load rhel7/default-peta4            # REQUIRED - loads the basic environment
-module load Java/1.8.0_152 bzip2/1.0.6 zlib/1.2.11 Boost/1.67.0 GSL/2.6
+#! module load Java/1.8.0_152 bzip2/1.0.6 zlib/1.2.11 Boost/1.67.0 GSL/2.6
 
 #! Are you using OpenMP (NB this is unrelated to OpenMPI)? If so increase this
 #! export OMP_NUM_THREADS=1
@@ -56,15 +56,16 @@ echo "This is job" $SLURM_ARRAY_TASK_ID
 workdir="$SLURM_SUBMIT_DIR" # The value of SLURM_SUBMIT_DIR sets workdir to the directory
 cd $workdir
 
-GRP_ARR=('resident' 'translocated' 'C' 'translocated_CR')
-FSJGRP="${GRP_ARR[$SLURM_ARRAY_TASK_ID]}"
-BAMLIST="/mnt/research/Fitz_Lab/projects/mosaic/map/mosaic_${FSJGRP}_bam_list.txt"
-OUTPREFIX="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_biallelic_snps_main_autosomes_qc_${FSJGRP}"
+INFILES='/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/revision1_sfs/input_lists.txt'
+ID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $INFILES | cut -f1)
+BAMLIST=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $INFILES | cut -f2)
+FFILE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $INFILES | cut -f3)
+OUTPREFIX="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/revision1_sfs/${ID}_allsites_main_autosomes_qc_postprobs"
 REGFILE='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ_V3_main_autosomes.txt'
-SITESFILE='/mnt/research/Fitz_Lab/projects/mosaic/variants/vcf/biallelic_snps/fsj_mosaic_biallelic_snps_main_autosomes_qc.pos'
+SITESFILE='/mnt/research/Fitz_Lab/projects/mosaic/variants/vcf/all_sites/fsj_mosaic_allsites_main_autosomes_qc.pos'
 REF='/mnt/research/Fitz_Lab/ref/bird/FSJ_V3/FSJ.V3.fa'
 
-CMD="angsd -bam $BAMLIST -out $OUTPREFIX -GL 1 -doSaf 1 -anc $REF -minQ 20 -minMapQ 20 -rf $REGFILE -sites $SITESFILE -P 4"
+CMD="angsd -bam $BAMLIST -out $OUTPREFIX -GL 1 -doSaf 2 -indF $FFILE -anc $REF -doMaf 1 -doMajorMinor 1 -minQ 20 -minMapQ 20 -rf $REGFILE -sites $SITESFILE -P 4"
 
 printf "\n%s\n\n" "$CMD"
 

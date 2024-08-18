@@ -56,7 +56,7 @@ echo "This is job" $SLURM_ARRAY_TASK_ID
 workdir="$SLURM_SUBMIT_DIR" # The value of SLURM_SUBMIT_DIR sets workdir to the directory
 cd $workdir
 
-CMP=('resident:C' 'resident:translocated' 'translocated:C')
+CMP=('resident:C' 'resident:translocated' 'translocated_CR:C')
 POP1=$(echo "${CMP[$SLURM_ARRAY_TASK_ID]}" | cut -f1 -d':')
 POP2=$(echo "${CMP[$SLURM_ARRAY_TASK_ID]}" | cut -f2 -d':')
 SAFIDX1="/mnt/research/Fitz_Lab/projects/mosaic/popgen/sfs/fsj_mosaic_biallelic_snps_main_autosomes_qc_${POP1}.saf.idx"
