@@ -1227,8 +1227,8 @@ Take random subsets of individuals such that the max pairwise r within each grou
 $ /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/scripts/subsetUnrelated.R /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/unrelated_subsets/translocated_relatedness_matrix.txt 0.4 328974 > /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/unrelated_subsets/translocated_relatedness_maxr0.4_ids_seed328974.txt
 $ /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/scripts/subsetUnrelated.R /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/unrelated_subsets/resident_cr_noE030_matrix.txt 0.4 836241 > /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/unrelated_subsets/resident_cr_noE030_relatedness_maxr0.4_ids_seed836241.txt
 
-The following subsets were created and are stored in the HPCC directory '/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs' (they were generated 
-during the ROH analyses and then used subsequently):
+#The following subsets were created and are stored in the HPCC directory '/mnt/research/Fitz_Lab/projects/mosaic/popgen/roh/inputs' (they were generated 
+#during the ROH analyses and then used subsequently):
 $ /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/scripts/subsetUnrelated.R contemporary_cr_relatedness_matrix.txt 0.4 836241 > contemporary_cr_relatedness_maxr0.4_ids.txt
 $ /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/scripts/subsetUnrelated.R resident_cr_relatedness_matrix.txt 0.4 836241 > resident_cr_relatedness_maxr0.4_ids.txt
 $ /mnt/research/Fitz_Lab/projects/mosaic/popgen/relatedness/scripts/subsetUnrelated.R site13_relatedness_matrix.txt 0.4 836241 > site13_relatedness_maxr0.4_ids.txt
