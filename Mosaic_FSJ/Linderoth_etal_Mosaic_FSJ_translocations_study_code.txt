@@ -1647,7 +1647,7 @@ meta$pop == "Duette_headwaters" | meta$pop == "Sun_City"), "M4")
 meta$group <- replace(meta$group, which(meta$group == "SITE_1" | meta$group == "SITE_12" | meta$group == "SITE_13" | 
 meta$group == "SITE_18" | meta$group == "TEXACO"), "Translocated")
 
-meta$group = factor(meta$group, levels=c("Contemporary", "Resident", "Translocated", "M4"))o
+meta$group = factor(meta$group, levels=c("Contemporary", "Resident", "Translocated", "M4"))
 
 # omit T_072 (RSW-K) because this site 1 bird was not translocated and migrated to LMSP, which is outside of the Core
 meta.sub <- meta[-which(meta$LAB_ID == "T_072"),]
