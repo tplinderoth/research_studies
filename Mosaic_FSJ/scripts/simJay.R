@@ -77,6 +77,10 @@ parseArgs <- function(argv = NULL, params) {
 				write(paste0("Error: ", args$events_file, " does not exist"), stderr())
 				err = 1
 			}
+		} else if (argv[i] == "--relate_matrix") {
+			args$relate_matrix = TRUE
+			i = i+1
+			next
 		} else {
 			write(paste0("Unknown argument ", argv[i]),stderr())
 			err = 1
@@ -118,6 +122,7 @@ defaults$n_timesteps = NA # Number of time steps (generations) to simulate
 defaults$max_offspring = 5 # maximum number of offspring a breeding pair can have in one season
 defaults$out = NA # output file prefix
 defaults$events_file = NA # file specifying events
+defaults$relate_matrix = FALSE # if true calculate relatedness matrix
 
 ## main
 
@@ -147,6 +152,7 @@ if (length(args) < 1) {
 	cat("--events_file  <FILE>  TSV file with head and columns [1] TIME (1-based), [2, ..., N] event parameters \n")
 	cat("--male_p  <FLOAT>  Controls the sex ratio and is the probability that an unsexed individual is male [", defaults$male_p, "]\n")
 	cat("--unif_reproduction  <>  Evoke to redistribute offspring uniformly at random among breeding pairs during reproduction\n")
+	cat("--relate_matrix  <>  Evoke to calculate additive relatedness matrix (requires nadiv package)\n")
 	cat("--seed  <INT>  Random number seed [random]\n")
 	cat("\n ** Events (specified by header names) **\n")
 	cat("TIME:  <INT>  1-based time step at which events happens\n")
@@ -170,11 +176,17 @@ if (is.na(params$n_timesteps)) stop("Must specify --n_timesteps\n")
 if (params$empiric_survive == FALSE && is.na(params$survive_file)) stop("Must supply survive_file if empiric_survive is false\n");
 if (is.na(params$out)) stop("Must supply outfile prefix name with --out\n")
 
+## load required libraries
+if (params$relate_matrix == TRUE) {
+	if (!require("nadiv")) stop("Error: --relate_matrix requires 'nadiv' package\n")
+}
+
 ## define outfile names
 
 out_ped = paste0(params$out,".ped") # pedigree output file
 out_idmap = paste0(params$out, ".id") # ID map output file
 out_stats = paste0(params$out, ".stats") # population stats (e.g. size, number pairs) output file
+out_rmat = paste0(params$out, ".rmat") # relatedness matrix
 
 ## set seed
 
@@ -195,7 +207,8 @@ write(paste0("\nSIMJAY INPUTS\n--------------\nind_file: ", params$ind_file, "\n
 "\nsurvival probability file: ", params$survive_file, "\nuse empirical survival probabilities from ind_file: ", params$empiric_survive, 
 "\nMinimum number of observations for empirical survival calculation: ", params$min_survive_obs,"\nage of sexual maturity: ", params$mature, 
 "\nMax offspring for a breeding pair in a season: ", params$max_offspring, "\nEvents parameter file: ", params$events_file,
-"\nproportion males: ", params$male_p, "\ndistribute offspring uniformly at random among breeding pairs: ", params$unif_reproduction, "\nseed: ", params$seed), stderr())
+"\nproportion males: ", params$male_p, "\ndistribute offspring uniformly at random among breeding pairs: ", params$unif_reproduction, 
+"\nCalculate relatedness matrix: ", params$relate_matrix, "\nseed: ", params$seed), stderr())
 
 ## read input files and set up dataframes
 
@@ -577,12 +590,26 @@ for (time_step in 1:params$n_timesteps) {
 truncate_idx = which(ped$COHORT_LAST > years[length(years)])
 if (length(truncate_idx) > 0) ped$COHORT_LAST[which(ped$COHORT_LAST > years[length(years)])] = years[length(years)]
 
+ped = ped[-which(is.na(ped$COHORT)),c(1:6)] # format pedigree
+
 write("\nSimulation complete", stderr())
+
+## calculate additive relatedness matrix
+
+rmat = NULL
+if (params$relate_matrix == TRUE) {
+	write("\nCalculating relatedness matrix", stderr())
+	ped2 = prepPed(ped[,1:4], gender='SEX', check=TRUE)
+	rmat = as.matrix(makeA(ped2[,1:3])) # as.matrix to convert sparse dsCMatrix into base matrix class
+}
+
 
 ## write output
 
 write(paste0("\nWriting result files:\n", out_ped, "\n", out_stats, "\n", out_idmap), stderr())
+if (!is.null(rmat)) write(out_rmat, stderr())
 
-write.table(ped[which(!is.na(ped$COHORT)),c(1:6)], file=out_ped, col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
+write.table(ped, file=out_ped, col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
 write.table(idmap[which(idmap$X1 %in% ind.df$ID[which(ind.df$ANCESTOR == 1)]),c(2,1)], file=out_idmap, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
 write.table(popstats, file=out_stats, col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
+if (!is.null(rmat)) write.table(rmat, file=out_rmat, col.names=TRUE, row.names=FALSE, quote=FALSE, sep=" ")
